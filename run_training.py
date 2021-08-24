@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import sys
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.models import Model
@@ -90,5 +91,6 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    print(sys.argv)
     args = parse_args()
     main(args)
