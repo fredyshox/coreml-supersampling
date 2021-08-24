@@ -122,23 +122,37 @@ class RGBDMotionDataset:
                     samples = self._image_seq_map_func(path, ids)
                     yield samples
         
-        dataset = tf.data.Dataset.from_generator(
-            image_generator,
-            output_signature=(
-                tf.TensorSpec(
-                    shape=(None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 3), dtype=tf.float32
-                ),
-                tf.TensorSpec(
-                    shape=(None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 1), dtype=tf.float32
-                ),
-                tf.TensorSpec(
-                    shape=(None, self.frames_per_sample - 1, self.image_patch_size[0], self.image_patch_size[1], 2), dtype=tf.float32
-                ),
-                tf.TensorSpec(
-                    shape=(None, self.target_patch_size[0], self.target_patch_size[1], 3), dtype=tf.float32
+        version = tf.__version__.split(".")
+        if int(version[1]) >= 5:
+            dataset = tf.data.Dataset.from_generator(
+                image_generator,
+                output_signature=(
+                    tf.TensorSpec(
+                        shape=(None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 3), dtype=tf.float32
+                    ),
+                    tf.TensorSpec(
+                        shape=(None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 1), dtype=tf.float32
+                    ),
+                    tf.TensorSpec(
+                        shape=(None, self.frames_per_sample - 1, self.image_patch_size[0], self.image_patch_size[1], 2), dtype=tf.float32
+                    ),
+                    tf.TensorSpec(
+                        shape=(None, self.target_patch_size[0], self.target_patch_size[1], 3), dtype=tf.float32
+                    )
                 )
             )
-        )
+        else:
+            dataset = tf.data.Dataset.from_generator(
+                image_generator,
+                output_types=(tf.float32, tf.float32, tf.float32, tf.float32),
+                output_shapes=(
+                    (None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 3),
+                    (None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 1),
+                    (None, self.frames_per_sample - 1, self.image_patch_size[0], self.image_patch_size[1], 2),
+                    (None, self.target_patch_size[0], self.target_patch_size[1], 3)
+                )
+            )
+
         dataset = dataset.flat_map(lambda rgb, d, mv, y: tf.data.Dataset.zip((
             tf.data.Dataset.from_tensor_slices(rgb),
             tf.data.Dataset.from_tensor_slices(d),
