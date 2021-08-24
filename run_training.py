@@ -48,13 +48,13 @@ def main(args):
         loss=ssim_loss,
         metrics=[psnr, ssim]
     )
-
+    ModelCheckpoint()
     model.fit(
         train_dataset,
         epochs=args.epochs,
         callbacks=[
             TensorBoard(log_dir=args.log_dir),
-            ModelCheckpoint(filepath=args.checkpoint_dir),
+            ModelCheckpoint(filepath=args.checkpoint_dir, save_best_only=True),
             EarlyStopping(patience=2)
         ],
         validation_data=val_dataset
@@ -73,7 +73,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train super sampling model")
     parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
     parser.add_argument("--log-dir", default="logs", help="Dir to save logs")
-    parser.add_argument("--checkpoint-dir", default="checkpoints", help="Dir to save model checkpoints")
+    parser.add_argument("--checkpoint-dir", default="checkpoints/model.hdf5", help="Dir to save model checkpoints")
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
     parser.add_argument("--epochs", default=15, type=int, help="Number of epochs")
     parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight")
