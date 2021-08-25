@@ -79,11 +79,10 @@ def parse_args():
     parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight")
     parser.add_argument("--patch-size", default=[120, 120], action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=[60, 60], action="store", type=int, nargs=2, help="Image patch step")
-    parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
-    parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
-    parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
+    parser.add_argument("--data-root-dir", default='', help="Dataset root dir")
+    parser.add_argument("--data-lr-subdir", default='', help="Dataset low-res subdir")
+    parser.add_argument("--data-hr-subdir", default='', help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
-
 
     args = parser.parse_args()
     return args
@@ -91,4 +90,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    import sys 
+    print("Cmdline arguments: {}".format(sys.argv))
+    print("Argparse args: {}".format(args))
     main(args)
