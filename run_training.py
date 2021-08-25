@@ -30,10 +30,10 @@ def main(args):
     train_fraction = 1 - args.data_val_fraction
     train_dataset = dataset_factory.tf_dataset(
         split_fraction=train_fraction, use_keras_input_mapping=True
-    ).batch(args.batch)
+    ).batch(args.batch).shuffle(buffer_size=512).prefetch(buffer_size=128)
     val_dataset = dataset_factory.tf_dataset(
         split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
-    ).batch(args.batch)
+    ).batch(args.batch).shuffle(buffer_size=512).prefetch(buffer_size=128)
 
     model = SuperSamplingModel()
     optimizer = Adam(learning_rate=args.lr)
@@ -83,7 +83,6 @@ def parse_args():
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
-
 
     args = parser.parse_args()
     return args
