@@ -48,7 +48,7 @@ def main(args):
         loss=ssim_loss,
         metrics=[psnr, ssim]
     )
-    ModelCheckpoint()
+    
     model.fit(
         train_dataset,
         epochs=args.epochs,
