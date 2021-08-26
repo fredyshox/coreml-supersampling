@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import tensorflow as tf 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.models import Model
@@ -14,6 +15,15 @@ from model.dataset import RGBDMotionDataset
 UPSAMPLING_FACTOR = 4
 
 def main(args):
+    if args.debug:
+        gpu_devices = tf.config.get_visible_devices("GPU")
+        try: 
+            if len(gpu_devices) != 0:
+                tf.config.experimental.set_memory_growth(gpu_devices[0], True)
+        except Exception as ex:
+            print(f"Debug exception: {ex}")
+            pass
+
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
         args.patch_size[1] * UPSAMPLING_FACTOR
@@ -33,7 +43,7 @@ def main(args):
     ).batch(args.batch).shuffle(buffer_size=512).prefetch(buffer_size=128)
     val_dataset = dataset_factory.tf_dataset(
         split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=512).prefetch(buffer_size=128)
+    ).batch(args.batch).shuffle(buffer_size=32).prefetch(buffer_size=16)
 
     model = SuperSamplingModel()
     optimizer = Adam(learning_rate=args.lr)
@@ -83,6 +93,7 @@ def parse_args():
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
     args = parser.parse_args()
     return args

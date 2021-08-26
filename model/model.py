@@ -22,7 +22,7 @@ class SuperSamplingModel(tf.keras.Model):
         self.perceptual_loss = perceptual_loss
         self.perceptual_loss_model = perceptual_loss_model
         self.perceptual_loss_model.trainable = False
-        self.perceptual_loss_weight = perceptual_loss_weight
+        self.perceptual_loss_weight =  tf.convert_to_tensor(perceptual_loss_weight, dtype=tf.float32)
 
     def call(self, inputs, training=None, mask=None):
         # every thing in format [batch, seq, height, width, channels]
@@ -53,7 +53,7 @@ class SuperSamplingModel(tf.keras.Model):
 
         flat_backward_warped_features = self.backward_warping(flat_upsampled_previous_features, flat_upsampled_motion_vectors)
         backward_warped_features = tf.reshape(flat_backward_warped_features, tf.shape(upsampled_previous_features))
-        
+
         upsampled_current_features = upsampled_features[:, previous_frame_count, :, :, :]
         reconstructed_frame = self.reconstruction(upsampled_current_features, backward_warped_features)
 
@@ -70,10 +70,32 @@ class SuperSamplingModel(tf.keras.Model):
             target_maps = self.perceptual_loss_model(targets)
             p_loss = self.perceptual_loss(target_maps, rec_maps)
             reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
-            loss = self.compiled_loss(targets, reconstructions_clipped) + self.perceptual_loss_weight * p_loss
+            loss = self.compiled_loss(
+                targets, reconstructions_clipped,
+                regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
+            )
         
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        self.compiled_metrics.update_state(targets, reconstructions)
+        self.compiled_metrics.update_state(targets, reconstructions_clipped)
 
         return {m.name: m.result() for m in self.metrics}
+
+    @tf.function
+    def test_step(self, data):
+        inputs, targets = data
+        assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
+
+        reconstructions = self(inputs, training=False)
+        rec_maps = self.perceptual_loss_model(reconstructions)
+        target_maps = self.perceptual_loss_model(targets)
+        p_loss = self.perceptual_loss(target_maps, rec_maps)
+        reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+
+        self.compiled_loss(
+            targets, reconstructions_clipped,
+            regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
+        )
+        self.compiled_metrics.update_state(targets, reconstructions_clipped)
+
+        return {m.name: m.result() for m in self.metrics} 
