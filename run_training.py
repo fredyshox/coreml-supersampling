@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.models import Model
@@ -14,6 +15,15 @@ from model.dataset import RGBDMotionDataset
 UPSAMPLING_FACTOR = 4
 
 def main(args):
+    if args.debug:
+        gpu_devices = tf.config.get_visible_devices("GPU")
+        try: 
+            if len(gpu_devices) != 0:
+                tf.config.experimental.set_memory_growth(gpu_devices[0], True)
+        except Exception as ex:
+            print(f"Exception: {ex}")
+            pass
+    
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
         args.patch_size[1] * UPSAMPLING_FACTOR
@@ -83,6 +93,7 @@ def parse_args():
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
+    parser.add_argument("--debug", action="store_true", type=bool, help="Enable debug mode")
 
     args = parser.parse_args()
     return args
