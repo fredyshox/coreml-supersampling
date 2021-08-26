@@ -40,10 +40,10 @@ def main(args):
     train_fraction = 1 - args.data_val_fraction
     train_dataset = dataset_factory.tf_dataset(
         split_fraction=train_fraction, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=512).prefetch(buffer_size=128)
+    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
     val_dataset = dataset_factory.tf_dataset(
         split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=32).prefetch(buffer_size=16)
+    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
 
     model = SuperSamplingModel()
     optimizer = Adam(learning_rate=args.lr)
@@ -94,6 +94,8 @@ def parse_args():
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--buffer-shuffle", default=512, type=int, help="Dataset shuffle buffer size")
+    parser.add_argument("--buffer-prefetch", default=128, type=int, help="Dataset prefetch buffer size")
 
     args = parser.parse_args()
     return args
@@ -101,4 +103,6 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.debug:
+        print(f"Argparse arguments: {args}")
     main(args)
