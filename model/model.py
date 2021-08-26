@@ -7,7 +7,7 @@ from model.components.reconstruction import ReconstructionModule4X
 from model.components.extraction import FeatureExtractionModule
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, frame_count=5):
+    def __init__(self, upsize_type, frame_count=5):
         super().__init__()
 
         self.frame_count = frame_count
@@ -15,7 +15,7 @@ class SuperSamplingModel(tf.keras.Model):
         self.zero_upsampling = ZeroUpsampling(scale_factor=4)
         self.bilinear_upsampling = UpSampling2D(size=(4, 4), interpolation='bilinear')
         self.backward_warping = BackwardWarp()
-        self.reconstruction = ReconstructionModule4X(frame_count=frame_count)
+        self.reconstruction = ReconstructionModule4X(frame_count=frame_count, upsize_type=upsize_type)
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
         super(SuperSamplingModel, self).compile(*args, **kwargs)

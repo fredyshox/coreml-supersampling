@@ -1,1 +1,0 @@
-KERNEL_SIZE = (3,3)
