@@ -94,8 +94,8 @@ def parse_args():
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("--buffer-shuffle", default=512, type=int, help="Dataset shuffle buffer size")
-    parser.add_argument("--buffer-prefetch", default=128, type=int, help="Dataset prefetch buffer size")
+    parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
+    parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
 
     args = parser.parse_args()
     return args
