@@ -93,7 +93,7 @@ def parse_args():
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
-    parser.add_argument("--debug", action="store_true", type=bool, help="Enable debug mode")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
     args = parser.parse_args()
     return args
