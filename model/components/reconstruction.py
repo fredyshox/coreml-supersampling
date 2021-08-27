@@ -1,9 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, UpSampling2D, MaxPool2D, Conv2DTranspose
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, Model
 from model.components import CONV2D_KERNEL_SIZE
 
-class ReconstructionModule4X(tf.Module):
+class ReconstructionModule4X(Model):
     def __init__(self, frame_count, upsize_type="upsample", channels_per_frame=12, name=None):
         super().__init__(name=name)
         assert upsize_type in ["upsample", "deconv"], "Supported upsize types are bilinear upsampling and transposed convolution"
@@ -47,7 +47,7 @@ class ReconstructionModule4X(tf.Module):
             Conv2D(3, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
         ])
 
-    def __call__(self, current_x, previous_x):
+    def call(self, current_x, previous_x):
         # axis 3, channel-wise
         flat_prev_channel_count = (self.frame_count - 1) * self.channels_per_frame
         desired_flat_shape = tf.concat(([-1], tf.shape(current_x)[1:][:-1], [flat_prev_channel_count]), axis=0)

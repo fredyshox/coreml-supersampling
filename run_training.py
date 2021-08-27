@@ -58,7 +58,6 @@ def main(args):
         loss=ssim_loss,
         metrics=[psnr, ssim]
     )
-    
     model.fit(
         train_dataset,
         epochs=args.epochs,

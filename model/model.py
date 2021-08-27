@@ -72,7 +72,7 @@ class SuperSamplingModel(tf.keras.Model):
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
             rec_maps = self.perceptual_loss_model(reconstructions)
-            target_maps = self.perceptual_loss_model(targets)
+            target_maps = self.perceptual_loss_model(targets, training=False)
             p_loss = self.perceptual_loss(target_maps, rec_maps)
             reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
             loss = self.compiled_loss(
