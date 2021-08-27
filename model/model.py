@@ -2,19 +2,26 @@ import tensorflow as tf
 from tensorflow.keras.layers import UpSampling2D
 
 from model.components.zero_upsampling import ZeroUpsampling
-from model.components.warping import BackwardWarp
+from model.components.warping import BackwardWarp, AccumulativeBackwardWarp, AccumulativeBackwardWarpFast
 from model.components.reconstruction import ReconstructionModule4X
 from model.components.extraction import FeatureExtractionModule
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, upsize_type, frame_count=5):
+    def __init__(self, upsize_type, warp_type, frame_count=5):
         super().__init__()
+
+        assert warp_type in ["single", "acc", "accfast"], "Invalid warp_type. Supported values: single, acc, accfast"
 
         self.frame_count = frame_count
         self.feature_extraction = FeatureExtractionModule()
         self.zero_upsampling = ZeroUpsampling(scale_factor=4)
         self.bilinear_upsampling = UpSampling2D(size=(4, 4), interpolation='bilinear')
-        self.backward_warping = BackwardWarp()
+        if warp_type == "single":
+            self.backward_warping = BackwardWarp()
+        elif warp_type == "accfast":
+            self.backward_warping = AccumulativeBackwardWarpFast()
+        else:
+            self.backward_warping = AccumulativeBackwardWarp()
         self.reconstruction = ReconstructionModule4X(frame_count=frame_count, upsize_type=upsize_type)
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
@@ -46,13 +53,11 @@ class SuperSamplingModel(tf.keras.Model):
         desired_motion_vec_shape = tf.concat(([-1], tf.shape(motion_frames)[-3:]), axis=0) # [batch, seq, height, width, channels] -> [batch, height, width, channels]
         flat_motion_vectors = tf.reshape(motion_frames, desired_motion_vec_shape)
         flat_upsampled_motion_vectors = self.bilinear_upsampling(flat_motion_vectors)
+        desired_upsampled_motion_vec_shape = tf.concat((tf.shape(motion_frames)[:2], tf.shape(flat_upsampled_motion_vectors)[-3:]), axis=0)
+        upsampled_motion_vectors = tf.reshape(flat_upsampled_motion_vectors, desired_upsampled_motion_vec_shape)
 
-        desired_features_shape = tf.concat(([-1], tf.shape(upsampled_features)[-3:]), axis=0) # [batch, seq, height, width, channels] -> [batch, height, width, channels]
         upsampled_previous_features = upsampled_features[:, :previous_frame_count, :, :, :]
-        flat_upsampled_previous_features = tf.reshape(upsampled_previous_features, desired_features_shape)
-
-        flat_backward_warped_features = self.backward_warping(flat_upsampled_previous_features, flat_upsampled_motion_vectors)
-        backward_warped_features = tf.reshape(flat_backward_warped_features, tf.shape(upsampled_previous_features))
+        backward_warped_features = self.backward_warping(upsampled_previous_features, upsampled_motion_vectors)
 
         upsampled_current_features = upsampled_features[:, previous_frame_count, :, :, :]
         reconstructed_frame = self.reconstruction(upsampled_current_features, backward_warped_features)

@@ -45,7 +45,7 @@ def main(args):
         split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
     ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
 
-    model = SuperSamplingModel(upsize_type=args.rec_upsize_type)
+    model = SuperSamplingModel(upsize_type=args.rec_upsize_type, warp_type=args.warp_type)
     optimizer = Adam(learning_rate=args.lr)
     perceptual_model = perceptual_vgg_model(target_size)
     perceptual_loss = PerceptualLoss()
@@ -81,7 +81,7 @@ def perceptual_vgg_model(target_size):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train super sampling model")
-    parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
+    parser.add_argument("--lr", default=1e-4, type=float, help="Learning rate")
     parser.add_argument("--log-dir", default="logs", help="Dir to save logs")
     parser.add_argument("--checkpoint-dir", default="checkpoints/model.hdf5", help="Dir to save model checkpoints")
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
@@ -96,6 +96,7 @@ def parse_args():
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
+    parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
     args = parser.parse_args()
