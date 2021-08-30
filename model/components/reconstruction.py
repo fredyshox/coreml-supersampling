@@ -3,15 +3,24 @@ from tensorflow.keras.layers import Conv2D, UpSampling2D, MaxPool2D, Conv2DTrans
 from tensorflow.keras.models import Sequential, Model
 from model.components import CONV2D_KERNEL_SIZE
 
+# filter counts for layer blocks
+_REC_LAYER_CONFIG_STANDARD = [64, 32, 64, 64, 128, 128, 64, 64, 32]
+_REC_LAYER_CONFIG_FAST = [32, 16, 32, 32, 64, 64, 32, 32, 16]
+_REC_LAYER_CONFIG_ULTRA_FAST = [16, 8, 16, 16, 32, 32, 16, 16, 8]
+
 class ReconstructionModule4X(Model):
-    def __init__(self, frame_count, upsize_type="upsample", channels_per_frame=12, name=None):
+    def __init__(self, frame_count, layer_config="standard", upsize_type="upsample", channels_per_frame=12, name=None):
         super().__init__(name=name)
         assert upsize_type in ["upsample", "deconv"], "Supported upsize types are bilinear upsampling and transposed convolution"
+        assert layer_config in ["standard", "fast", "ultrafast"], "Supported layer configs are standard, fast and ultrafast"
         
         input_shape = (None, None, frame_count * channels_per_frame)
+        layer_config = self._layer_config_for_name(layer_config)
         self.frame_count = frame_count
         self.channels_per_frame = channels_per_frame
         self.upsize_type = upsize_type
+
+        assert len(layer_config) == 9, "Invalid layer config size"
 
         def upsize_block_constructor(ratio, filters):
             if upsize_type == "upsample":
@@ -25,27 +34,37 @@ class ReconstructionModule4X(Model):
                 ]
         
         self.encoder_0 = Sequential([
-            Conv2D(64, CONV2D_KERNEL_SIZE, activation="relu", padding="same", input_shape=input_shape),
-            Conv2D(32, CONV2D_KERNEL_SIZE, activation="relu", padding="same")
+            Conv2D(layer_config[0], CONV2D_KERNEL_SIZE, activation="relu", padding="same", input_shape=input_shape),
+            Conv2D(layer_config[1], CONV2D_KERNEL_SIZE, activation="relu", padding="same")
         ])
         self.encoder_0_pooling = MaxPool2D()
         self.encoder_1 = Sequential([
-            Conv2D(64, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
-            Conv2D(64, CONV2D_KERNEL_SIZE, activation="relu", padding="same")
+            Conv2D(layer_config[2], CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
+            Conv2D(layer_config[3], CONV2D_KERNEL_SIZE, activation="relu", padding="same")
         ])
         self.encoder_1_pooling = MaxPool2D()
         self.center = Sequential([
-            Conv2D(128, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
-            *upsize_block_constructor((2, 2), 128)
+            Conv2D(layer_config[4], CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
+            *upsize_block_constructor((2, 2), layer_config[5])
         ])
         self.decoder_0 = Sequential([
-            Conv2D(64, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
-            *upsize_block_constructor((2, 2), 64)
+            Conv2D(layer_config[6], CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
+            *upsize_block_constructor((2, 2), layer_config[7])
         ])
         self.decoder_1 = Sequential([
-            Conv2D(32, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
+            Conv2D(layer_config[8], CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
             Conv2D(3, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
         ])
+
+    def _layer_config_for_name(self, name):
+        if name == "standard":
+            return _REC_LAYER_CONFIG_STANDARD
+        elif name == "fast":
+            return _REC_LAYER_CONFIG_FAST
+        elif name == "ultrafast":
+            return _REC_LAYER_CONFIG_ULTRA_FAST
+        else:
+            raise ValueError()
 
     def call(self, current_x, previous_x):
         # axis 3, channel-wise
