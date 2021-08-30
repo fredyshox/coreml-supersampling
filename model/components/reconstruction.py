@@ -21,6 +21,7 @@ class ReconstructionModule4X(Model):
         self.upsize_type = upsize_type
 
         assert len(layer_config) == 9, "Invalid layer config size"
+        print(f"Layerconfig: {layer_config}, upsize: {upsize_type}")
 
         def upsize_block_constructor(ratio, filters):
             if upsize_type == "upsample":
