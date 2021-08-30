@@ -61,12 +61,13 @@ def main(args):
     model.fit(
         train_dataset,
         epochs=args.epochs,
+        steps_per_epoch=512,
         callbacks=[
             TensorBoard(log_dir=args.log_dir),
             ModelCheckpoint(filepath=args.checkpoint_dir, save_best_only=True),
             EarlyStopping(patience=2)
-        ],
-        validation_data=val_dataset
+        ]
+        #validation_data=val_dataset
     )
 
 
