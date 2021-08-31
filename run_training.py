@@ -11,6 +11,7 @@ from model.model import SuperSamplingModel
 from model.loss import PerceptualLoss, SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
+from model.utils import tf_minor_version_geq
 
 UPSAMPLING_FACTOR = 4
 
@@ -23,6 +24,8 @@ def main(args):
         except Exception as ex:
             print(f"Debug exception: {ex}")
             pass
+    if tf_minor_version_geq(4):
+        tf.config.experimental.enable_tensor_float_32_execution(not args.no_tf32)
 
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
@@ -51,6 +54,8 @@ def main(args):
         warp_type=args.warp_type
     )
     optimizer = Adam(learning_rate=args.lr)
+    if args.amp:
+        optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
     perceptual_model = perceptual_vgg_model(target_size)
     perceptual_loss = PerceptualLoss()
     ssim_loss = SSIMLoss()
@@ -102,6 +107,8 @@ def parse_args():
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
+    parser.add_argument("--no-tf32", action="store_false", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
     args = parser.parse_args()
