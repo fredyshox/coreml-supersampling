@@ -26,7 +26,9 @@ def main(args):
             pass
     if tf_minor_version_geq(4):
         tf.config.experimental.enable_tensor_float_32_execution(not args.no_tf32)
-
+    if tf_minor_version_geq(6):
+        if args.amp:
+            tf.keras.mixed_precision.set_global_policy('mixed_float16')
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
         args.patch_size[1] * UPSAMPLING_FACTOR
@@ -55,9 +57,7 @@ def main(args):
     )
     optimizer = Adam(learning_rate=args.lr)
     if args.amp:
-        if tf_minor_version_geq(6):
-            optimizer = tf.compat.v1.mixed_precision.enable_mixed_precision_graph_rewrite(optimizer)
-        else:
+        if not tf_minor_version_geq(6):
             optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
     perceptual_model = perceptual_vgg_model(target_size)
     perceptual_loss = PerceptualLoss()
