@@ -3,6 +3,8 @@ from glob import glob
 import tensorflow as tf
 import tensorflow_io as tfio
 
+from model.utils import tf_minor_version_geq
+
 COLOR_ID = "COLOR"
 DEPTH_ID = "DEPTH"
 MOTION_ID = "MOTIONVECTORS"
@@ -122,8 +124,7 @@ class RGBDMotionDataset:
                     samples = self._image_seq_map_func(path, ids)
                     yield samples
         
-        version = tf.__version__.split(".")
-        if int(version[1]) >= 5:
+        if tf_minor_version_geq(5):
             dataset = tf.data.Dataset.from_generator(
                 image_generator,
                 output_signature=(
