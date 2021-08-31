@@ -8,6 +8,6 @@ class ZeroUpsampling(tf.Module):
 
     def __call__(self, x):
         input_shape = tf.shape(x)
-        kernel = tf.ones([1, 1, input_shape[-1], input_shape[-1]])
+        kernel = tf.ones([1, 1, input_shape[-1], input_shape[-1]], dtype=x.dtype)
         output_shape = input_shape * self.scale_mat
         return tf.nn.conv2d_transpose(x, kernel, output_shape, self.scale_factor, padding="VALID")
