@@ -72,7 +72,7 @@ def main(args):
         epochs=args.epochs,
         steps_per_epoch=512,
         callbacks=[
-            TensorBoard(log_dir=args.log_dir),
+            TensorBoard(log_dir=args.log_dir, profile_batch=1),
             ModelCheckpoint(filepath=args.checkpoint_dir, save_best_only=True),
             EarlyStopping(patience=2)
         ]
