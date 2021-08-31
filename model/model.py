@@ -29,7 +29,7 @@ class SuperSamplingModel(tf.keras.Model):
         self.perceptual_loss = perceptual_loss
         self.perceptual_loss_model = perceptual_loss_model
         self.perceptual_loss_model.trainable = False
-        self.perceptual_loss_weight =  tf.convert_to_tensor(perceptual_loss_weight, dtype=tf.float32)
+        self.perceptual_loss_weight =  perceptual_loss_weight
 
     def call(self, inputs, training=None, mask=None):
         # every thing in format [batch, seq, height, width, channels]
