@@ -55,7 +55,10 @@ def main(args):
     )
     optimizer = Adam(learning_rate=args.lr)
     if args.amp:
-        optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
+        if tf_minor_version_geq(6):
+            optimizer = tf.compat.v1.mixed_precision.enable_mixed_precision_graph_rewrite(optimizer)
+        else:
+            optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
     perceptual_model = perceptual_vgg_model(target_size)
     perceptual_loss = PerceptualLoss()
     ssim_loss = SSIMLoss()
@@ -72,7 +75,7 @@ def main(args):
         epochs=args.epochs,
         steps_per_epoch=512,
         callbacks=[
-            TensorBoard(log_dir=args.log_dir, profile_batch=1),
+            TensorBoard(log_dir=args.log_dir),
             ModelCheckpoint(filepath=args.checkpoint_dir, save_best_only=True),
             EarlyStopping(patience=2)
         ]
