@@ -26,7 +26,12 @@ def main(args):
             pass
     if tf_minor_version_geq(4):
         tf.config.experimental.enable_tensor_float_32_execution(not args.no_tf32)
-
+    if args.amp:
+        if tf_minor_version_geq(6):
+            tf.keras.mixed_precision.set_global_policy("mixed_float16")
+        else:
+            tf.keras.mixed_precision.experimental.set_policy("mixed_float16")
+    
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
         args.patch_size[1] * UPSAMPLING_FACTOR
@@ -50,8 +55,6 @@ def main(args):
 
     model = SuperSamplingModel(upsize_type=args.rec_upsize_type, warp_type=args.warp_type)
     optimizer = Adam(learning_rate=args.lr)
-    if args.amp:
-        optimizer = tf.train.experimental.enable_mixed_precision_graph_rewrite(optimizer)
     perceptual_model = perceptual_vgg_model(target_size)
     perceptual_loss = PerceptualLoss()
     ssim_loss = SSIMLoss()
@@ -68,7 +71,7 @@ def main(args):
         epochs=args.epochs,
         callbacks=[
             TensorBoard(log_dir=args.log_dir),
-            ModelCheckpoint(filepath=args.checkpoint_dir, save_best_only=True),
+            ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True),
             EarlyStopping(patience=2)
         ],
         validation_data=val_dataset
@@ -87,7 +90,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train super sampling model")
     parser.add_argument("--lr", default=1e-4, type=float, help="Learning rate")
     parser.add_argument("--log-dir", default="logs", help="Dir to save logs")
-    parser.add_argument("--checkpoint-dir", default="checkpoints/model.hdf5", help="Dir to save model checkpoints")
+    parser.add_argument("--checkpoint-dir", default="checkpoints/model.weights.{epoch:02d}-{val_loss:.2f}.hdf5", help="Format/filepath to save model checkpoints")
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
     parser.add_argument("--epochs", default=15, type=int, help="Number of epochs")
     parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight")
@@ -103,7 +106,7 @@ def parse_args():
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
-    parser.add_argument("--no-tf32", action="store_false", help="Disable tensor float 32 support")
+    parser.add_argument("--no-tf32", action="store_true", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
     args = parser.parse_args()
