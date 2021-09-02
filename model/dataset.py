@@ -83,11 +83,11 @@ class RGBDMotionDataset:
 
         return (*x, y)
 
-    def _create_image_patches(self, tensors, mode='input'):
-        if mode == 'input':
+    def _create_image_patches(self, tensors, mode="input"):
+        if mode == "input":
             kernel = (1, self.image_patch_size[0], self.image_patch_size[1], 1)
             strides = (1, self.image_patch_step[0], self.image_patch_step[1], 1)
-        elif mode == 'target':
+        elif mode == "target":
             kernel = (1, self.target_patch_size[0], self.target_patch_size[1], 1)
             strides = (1, self.target_patch_step[0], self.target_patch_step[1], 1)
         else:
@@ -100,13 +100,25 @@ class RGBDMotionDataset:
         
         return patches # shape is: [patch_count, batch_size, height, width, channels]
 
-    def _frame_indices(self):
+    def _frame_indices(self, overlap_mode):
         indices = []
-        for i in range(self.frames_per_sample, self.frames_per_rec + 1):
+        step = None
+        if isinstance(overlap_mode, str):
+            step = 1 if overlap_mode == "all" else self.frames_per_sample # none
+        elif isinstance(overlap_mode, int):
+            step = overlap_mode
+
+        for i in range(self.frames_per_sample, self.frames_per_rec + 1, step):
             indices.append(list(range(i - self.frames_per_sample, i)))
+
         return indices
 
-    def tf_dataset(self, split_fraction=None, take_top=False, use_keras_input_mapping=False):
+    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False):
+        if isinstance(seq_frame_overlap_mode, str):
+            assert seq_frame_overlap_mode in ["all", "none"], "seq_frame_overlap_mode possible string values overlap_all, overlap_none"
+        elif isinstance(seq_frame_overlap_mode, int):
+            assert seq_frame_overlap_mode in range(1, self.frames_per_sample + 1), "seq_frame_overlap_mode integer value must be in range 1...frames_per_sample"
+
         rec_paths = glob(os.path.join(self.root_dir, "*"))
         rec_paths = [path for path in rec_paths if os.path.isdir(path)]
         if split_fraction is not None:
@@ -120,7 +132,7 @@ class RGBDMotionDataset:
 
         def image_generator():
             for path in rec_paths:
-                for ids in self._frame_indices():
+                for ids in self._frame_indices(seq_frame_overlap_mode):
                     samples = self._image_seq_map_func(path, ids)
                     yield samples
         

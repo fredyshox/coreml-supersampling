@@ -37,6 +37,9 @@ def main(args):
     os.makedirs(os.path.dirname(args.checkpoint_dir), exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
     
+    seq_overlap_mode = args.data_seq_overlap_mode
+    if seq_overlap_mode.isnumeric():
+        seq_overlap_mode = int(seq_overlap_mode)
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
         args.patch_size[1] * UPSAMPLING_FACTOR
@@ -52,10 +55,10 @@ def main(args):
     )
     train_fraction = 1 - args.data_val_fraction
     train_dataset = dataset_factory.tf_dataset(
-        split_fraction=train_fraction, use_keras_input_mapping=True
+        seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, use_keras_input_mapping=True
     ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
     val_dataset = dataset_factory.tf_dataset(
-        split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
+        seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
     ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
 
     model = SuperSamplingModel(upsize_type=args.rec_upsize_type, warp_type=args.warp_type)
@@ -105,6 +108,7 @@ def parse_args():
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
+    parser.add_argument("--data-seq-overlap-mode", default="all", help="Dataset frame sequence overlap strategory (all, none, [0-9])")
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
