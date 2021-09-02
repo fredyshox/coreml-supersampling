@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import argparse
 import tensorflow as tf 
 from tensorflow.keras.optimizers import Adam
@@ -31,6 +32,10 @@ def main(args):
             tf.keras.mixed_precision.set_global_policy("mixed_float16")
         else:
             tf.keras.mixed_precision.experimental.set_policy("mixed_float16")
+    
+    # create output dirs for checkpoint and logs
+    os.makedirs(os.path.dirname(args.checkpoint_dir), exist_ok=True)
+    os.makedirs(args.log_dir, exist_ok=True)
     
     target_size = (
         args.patch_size[0] * UPSAMPLING_FACTOR, 
