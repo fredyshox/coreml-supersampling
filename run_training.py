@@ -74,9 +74,20 @@ def main(args):
         loss=ssim_loss,
         metrics=[psnr, ssim]
     )
+    if args.weights_path is not None and len(args.weights_path) != 0:
+        input_element_spec = train_dataset.element_spec[0]
+        dummy_data = dict()
+        for key in ["color", "depth", "motion"]:
+            shape = input_element_spec[key].shape
+            print([args.batch, *shape[-4:]])
+            dummy_tensor = tf.ones([args.batch, *shape[-4:]])
+            dummy_data[key] = dummy_tensor
+        _ = model(dummy_data)
+        model.load_weights(args.weights_path, by_name=True)
     model.fit(
         train_dataset,
         epochs=args.epochs,
+        initial_epoch=args.initial_epoch,
         callbacks=[
             TensorBoard(log_dir=args.log_dir),
             ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True),
@@ -114,6 +125,8 @@ def parse_args():
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
+    parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
     parser.add_argument("--no-tf32", action="store_true", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
