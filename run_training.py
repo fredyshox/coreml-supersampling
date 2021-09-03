@@ -79,11 +79,10 @@ def main(args):
         dummy_data = dict()
         for key in ["color", "depth", "motion"]:
             shape = input_element_spec[key].shape
-            print([args.batch, *shape[-4:]])
             dummy_tensor = tf.ones([args.batch, *shape[-4:]])
             dummy_data[key] = dummy_tensor
         _ = model(dummy_data)
-        model.load_weights(args.weights_path, by_name=True)
+        model.load_weights(args.weights_path)
     model.fit(
         train_dataset,
         epochs=args.epochs,
