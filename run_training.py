@@ -89,8 +89,7 @@ def main(args):
         initial_epoch=args.initial_epoch,
         callbacks=[
             TensorBoard(log_dir=args.log_dir),
-            ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True),
-            EarlyStopping(patience=2)
+            ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
         ],
         validation_data=val_dataset
     )
