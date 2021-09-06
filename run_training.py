@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
 
 from model.model import SuperSamplingModel
 from model.loss import PerceptualLoss, SSIMLoss
@@ -83,14 +83,25 @@ def main(args):
             dummy_data[key] = dummy_tensor
         _ = model(dummy_data)
         model.load_weights(args.weights_path)
+    callbacks = [
+        TensorBoard(log_dir=args.log_dir),
+        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
+    ]
+    if args.lr_decay is not None:
+        def drop_step_decay(epoch):
+            initial_lr = args.lr
+            drop = args.lr_decay
+            epochs_drop = 5
+            lr = initial_lr * tf.math.pow(drop, tf.math.floor((1+epoch)/epochs_drop))
+            return lr
+        callbacks.append(
+            LearningRateScheduler(drop_step_decay)
+        )
     model.fit(
         train_dataset,
         epochs=args.epochs,
         initial_epoch=args.initial_epoch,
-        callbacks=[
-            TensorBoard(log_dir=args.log_dir),
-            ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
-        ],
+        callbacks=callbacks,
         validation_data=val_dataset
     )
 
@@ -106,6 +117,7 @@ def perceptual_vgg_model(target_size):
 def parse_args():
     parser = argparse.ArgumentParser(description="Train super sampling model")
     parser.add_argument("--lr", default=1e-4, type=float, help="Learning rate")
+    parser.add_argument("--lr-decay", default=None, type=float, help="Learning rate decay")
     parser.add_argument("--log-dir", default="logs", help="Dir to save logs")
     parser.add_argument("--checkpoint-dir", default="checkpoints/model.weights.{epoch:02d}-{val_loss:.2f}.hdf5", help="Format/filepath to save model checkpoints")
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
