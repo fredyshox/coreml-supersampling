@@ -132,7 +132,7 @@ def parse_args():
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
-    parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraciton")
+    parser.add_argument("--data-val-fraction", default=0.1, type=float, help="Validation dataset fraction")
     parser.add_argument("--data-seq-overlap-mode", default="all", help="Dataset frame sequence overlap strategory (all, none, [0-9])")
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
