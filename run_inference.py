@@ -46,7 +46,8 @@ def main(args):
         task = clearml.Task.current_task()
         task.upload_artifact("predictions", artifact_object=image_path)
         logger = clearml.Logger.current_logger()
-        debub_sample_filenames = random.shuffle(os.listdir(images_path))[:DEBUG_SAMPLE_COUNT]
+        all_filenames = os.listdir(images_path)
+        debub_sample_filenames = random.sample(all_filenames, k=len(all_filenames))[:DEBUG_SAMPLE_COUNT]
         for filename in debub_sample_filenames:
             sample_path = os.path.join(images_path, filename)
             logger.report_image("reconstruction", f"Image {filename}", local_path=sample_path)
