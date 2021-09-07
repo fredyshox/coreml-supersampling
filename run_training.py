@@ -89,7 +89,7 @@ def main(args):
         model.load_weights(args.weights_path)
     callbacks = [
         TensorBoard(log_dir=args.log_dir),
-        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
+        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=not args.save_model)
     ]
     if args.lr_decay is not None:
         def drop_step_decay(epoch):
@@ -141,6 +141,7 @@ def parse_args():
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
+    parser.add_argument("--save-model", action="store_true", help="Save whole model, not only weights")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
     parser.add_argument("--no-tf32", action="store_true", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
