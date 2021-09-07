@@ -23,7 +23,7 @@ def main(args):
     )
     dataset = dataset_factory.tf_dataset(
         seq_frame_overlap_mode="all", use_keras_input_mapping=True, create_patches=False
-    ).take(args.data_limit).batch(args.batch).prefetch(args.buffer_prefetch)
+    ).batch(args.batch).take(args.data_limit).prefetch(args.buffer_prefetch)
 
     model = SuperSamplingModel(
         layer_config=args.rec_layer_config,
