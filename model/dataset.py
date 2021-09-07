@@ -168,10 +168,10 @@ class RGBDMotionDataset:
 
         if not create_patches:
             input_patch_size, target_patch_size = self._discover_image_sizes()
-        elif self.image_patch_size is None or self.target_patch_size is None:
+        elif self.image_patch_size is not None or self.target_patch_size is not None:
             input_patch_size, target_patch_size = self.image_patch_size, self.target_patch_size
         else:
-            raise ValueError("Error")
+            raise ValueError("image_patch_size, target_patch_size must not be None when create_patches is False")
         
         if tf_minor_version_geq(5):
             dataset = tf.data.Dataset.from_generator(
