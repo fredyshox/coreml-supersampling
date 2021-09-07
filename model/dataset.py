@@ -109,7 +109,7 @@ class RGBDMotionDataset:
                 tf.expand_dims(tf.stack(lr_depth_tensors), axis=0),
                 tf.expand_dims(tf.stack(lr_motion_tensors), axis=0)
             ]
-            y = tf.expand_dims(hr_color_tensor, axis=0)
+            y = hr_color_tensor
 
         return (*x, y)
 
