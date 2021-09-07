@@ -37,7 +37,8 @@ def main(args):
     os.makedirs(images_path, exist_ok=True)
     for i, image in tqdm(enumerate(predictions), desc="Saving predictions"):
         image_path = os.path.join(images_path, f"{i}_{UPSAMPLING_FACTOR}x.png")
-        image_data = tf.io.encode_png(image)
+        u8_image = tf.image.convert_image_dtype(image, tf.uint8)
+        image_data = tf.io.encode_png(u8_image)
         tf.io.write_file(image_path, image_data)
     
     if args.clearml:
