@@ -1,6 +1,7 @@
 import os
 from glob import glob
 import tensorflow as tf
+from tensorflow.python.tf2 import enable
 import tensorflow_io as tfio
 
 from model.utils import tf_minor_version_geq
@@ -30,7 +31,7 @@ class RGBDMotionDataset:
         self.lr_subdir = lr_subdir
         self.hr_subdir = hr_subdir
 
-    def _image_seq_map_func(self, rec_subdir, indices):
+    def _image_seq_map_func(self, rec_subdir, indices, enable_patches):
         rec_name = os.path.basename(rec_subdir)
         lr_color_paths = [
             os.path.join(self.root_dir, rec_subdir, self.lr_subdir, f"{rec_name}.{self.lr_subdir}.{COLOR_ID}.{i}.png") 
@@ -74,12 +75,20 @@ class RGBDMotionDataset:
             axis=0
         )
 
-        x = [
-            self._create_image_patches(tf.stack(lr_color_tensors)), 
-            self._create_image_patches(tf.stack(lr_depth_tensors)), 
-            self._create_image_patches(tf.stack(lr_motion_tensors))
-        ]
-        y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode='target'), axis=[1])
+        if enable_patches:
+            x = [
+                self._create_image_patches(tf.stack(lr_color_tensors)), 
+                self._create_image_patches(tf.stack(lr_depth_tensors)), 
+                self._create_image_patches(tf.stack(lr_motion_tensors))
+            ]
+            y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode='target'), axis=[1])
+        else:
+            x = [
+                tf.stack(lr_color_tensors),
+                tf.stack(lr_depth_tensors),
+                tf.stack(lr_motion_tensors)
+            ]
+            y = hr_color_tensor
 
         return (*x, y)
 
@@ -113,7 +122,7 @@ class RGBDMotionDataset:
 
         return indices
 
-    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False):
+    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False, create_patches=True):
         if isinstance(seq_frame_overlap_mode, str):
             assert seq_frame_overlap_mode in ["all", "none"], "seq_frame_overlap_mode possible string values overlap_all, overlap_none"
         elif isinstance(seq_frame_overlap_mode, int):
@@ -133,7 +142,7 @@ class RGBDMotionDataset:
         def image_generator():
             for path in rec_paths:
                 for ids in self._frame_indices(seq_frame_overlap_mode):
-                    samples = self._image_seq_map_func(path, ids)
+                    samples = self._image_seq_map_func(path, ids, create_patches)
                     yield samples
         
         if tf_minor_version_geq(5):

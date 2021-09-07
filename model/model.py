@@ -7,7 +7,7 @@ from model.components.reconstruction import ReconstructionModule4X
 from model.components.extraction import FeatureExtractionModule
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, upsize_type, warp_type, frame_count=5):
+    def __init__(self, layer_config, upsize_type, warp_type, frame_count=5):
         super().__init__()
 
         assert warp_type in ["single", "acc", "accfast"], "Invalid warp_type. Supported values: single, acc, accfast"
@@ -22,7 +22,7 @@ class SuperSamplingModel(tf.keras.Model):
             self.backward_warping = AccumulativeBackwardWarpFast()
         else:
             self.backward_warping = AccumulativeBackwardWarp()
-        self.reconstruction = ReconstructionModule4X(frame_count=frame_count, upsize_type=upsize_type)
+        self.reconstruction = ReconstructionModule4X(frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type)
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
         super(SuperSamplingModel, self).compile(*args, **kwargs)
