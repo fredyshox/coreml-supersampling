@@ -105,11 +105,11 @@ class RGBDMotionDataset:
             y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode='target'), axis=[1])
         else:
             x = [
-                tf.stack(lr_color_tensors),
-                tf.stack(lr_depth_tensors),
-                tf.stack(lr_motion_tensors)
+                tf.expand_dims(tf.stack(lr_color_tensors), axis=0),
+                tf.expand_dims(tf.stack(lr_depth_tensors), axis=0),
+                tf.expand_dims(tf.stack(lr_motion_tensors), axis=0)
             ]
-            y = hr_color_tensor
+            y = tf.expand_dims(hr_color_tensor, axis=0)
 
         return (*x, y)
 
