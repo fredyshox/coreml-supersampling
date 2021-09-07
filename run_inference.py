@@ -31,7 +31,7 @@ def main(args):
         warp_type=args.warp_type
     )
     load_weights(model, args.weights_path, dataset)
-    predictions = model.predict(dataset)
+    predictions = model.predict(dataset, verbose=1)
 
     images_path = os.path.join(args.output_dir, "reconstructions")
     os.makedirs(images_path, exist_ok=True)
