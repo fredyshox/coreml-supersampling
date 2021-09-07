@@ -64,7 +64,7 @@ def load_weights(model, weight_path, dataset):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run inference using super sampling model")
-    parser.add_argument("--data-dir", required=True, help="Dataset root dir")
+    parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-limit", default=None, type=int, help="Dataset sample limit")
