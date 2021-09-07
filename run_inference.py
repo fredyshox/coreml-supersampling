@@ -44,7 +44,7 @@ def main(args):
     if args.clearml:
         import clearml
         task = clearml.Task.current_task()
-        task.upload_artifact("predictions", artifact_object=image_path)
+        task.upload_artifact("predictions", artifact_object=images_path)
         logger = clearml.Logger.current_logger()
         all_filenames = os.listdir(images_path)
         debub_sample_filenames = random.sample(all_filenames, k=len(all_filenames))[:DEBUG_SAMPLE_COUNT]
