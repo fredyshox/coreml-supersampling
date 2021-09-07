@@ -20,7 +20,6 @@ class RGBDMotionDataset:
         target_patch_size=None,
         target_patch_step=None
     ):
-        assert(len(image_patch_size) == 2)
         self.image_patch_size = image_patch_size
         self.image_patch_step = image_patch_step
         self.target_patch_size = target_patch_size
