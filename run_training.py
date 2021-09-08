@@ -7,6 +7,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
+from tensorflow.keras.models import load_model
 
 from model.model import SuperSamplingModel
 from model.loss import PerceptualLoss, SSIMLoss
@@ -78,6 +79,7 @@ def main(args):
         loss=ssim_loss,
         metrics=[psnr, ssim]
     )
+
     if args.weights_path is not None and len(args.weights_path) != 0:
         input_element_spec = train_dataset.element_spec[0]
         dummy_data = dict()
@@ -87,9 +89,10 @@ def main(args):
             dummy_data[key] = dummy_tensor
         _ = model(dummy_data)
         model.load_weights(args.weights_path)
+    
     callbacks = [
         TensorBoard(log_dir=args.log_dir),
-        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=not args.save_model)
+        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
     ]
     if args.lr_decay is not None:
         def drop_step_decay(epoch):
@@ -101,6 +104,7 @@ def main(args):
         callbacks.append(
             LearningRateScheduler(drop_step_decay)
         )
+    
     model.fit(
         train_dataset,
         epochs=args.epochs,
@@ -141,7 +145,6 @@ def parse_args():
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
-    parser.add_argument("--save-model", action="store_true", help="Save whole model, not only weights")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
     parser.add_argument("--no-tf32", action="store_true", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
