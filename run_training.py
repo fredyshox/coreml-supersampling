@@ -33,6 +33,8 @@ def main(args):
             tf.keras.mixed_precision.set_global_policy("mixed_float16")
         else:
             tf.keras.mixed_precision.experimental.set_policy("mixed_float16")
+    if args.seed is not None:
+        tf.random.set_seed(args.seed)
     
     # create output dirs for checkpoint and logs
     os.makedirs(os.path.dirname(args.checkpoint_dir), exist_ok=True)
@@ -57,10 +59,10 @@ def main(args):
     train_fraction = 1 - args.data_val_fraction
     train_dataset = dataset_factory.tf_dataset(
         seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
+    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle, seed=args.seed).prefetch(buffer_size=args.buffer_prefetch)
     val_dataset = dataset_factory.tf_dataset(
         seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
+    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle, seed=args.seed).prefetch(buffer_size=args.buffer_prefetch)
 
     model = SuperSamplingModel(
         layer_config=args.rec_layer_config, 
@@ -145,6 +147,7 @@ def parse_args():
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
+    parser.add_argument("--seed", default=None, type=int, help="Random seed")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
     parser.add_argument("--no-tf32", action="store_true", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
