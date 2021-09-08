@@ -71,10 +71,10 @@ class SuperSamplingModel(tf.keras.Model):
 
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
-            rec_maps = self.perceptual_loss_model(reconstructions)
+            reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+            rec_maps = self.perceptual_loss_model(reconstructions_clipped)
             target_maps = self.perceptual_loss_model(targets, training=False)
             p_loss = self.perceptual_loss(target_maps, rec_maps)
-            reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
             loss = self.compiled_loss(
                 targets, reconstructions_clipped,
                 regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
@@ -92,10 +92,10 @@ class SuperSamplingModel(tf.keras.Model):
         assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
 
         reconstructions = self(inputs, training=False)
-        rec_maps = self.perceptual_loss_model(reconstructions)
+        reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+        rec_maps = self.perceptual_loss_model(reconstructions_clipped)
         target_maps = self.perceptual_loss_model(targets)
         p_loss = self.perceptual_loss(target_maps, rec_maps)
-        reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
 
         self.compiled_loss(
             targets, reconstructions_clipped,

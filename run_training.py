@@ -7,15 +7,17 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
-from tensorflow.keras.models import load_model
+from tensorflow.python.keras.utils.generic_utils import default
 
 from model.model import SuperSamplingModel
 from model.loss import PerceptualLoss, SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
 from model.utils import tf_minor_version_geq
+from model.vgg import PerceptualFPVGG16
 
 UPSAMPLING_FACTOR = 4
+DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
 
 def main(args):
     if args.debug:
@@ -70,7 +72,11 @@ def main(args):
         warp_type=args.warp_type
     )
     optimizer = Adam(learning_rate=args.lr)
-    perceptual_model = perceptual_vgg_model(target_size)
+    perceptual_model = PerceptualFPVGG16(
+        weights="imagenet",
+        input_shape=(*target_size, 3),
+        output_layer_names=["block2_conv2", "block3_conv3"]
+    )
     perceptual_loss = PerceptualLoss()
     ssim_loss = SSIMLoss()
     model.compile(
@@ -115,15 +121,6 @@ def main(args):
         validation_data=val_dataset
     )
 
-
-def perceptual_vgg_model(target_size):
-    vgg_model = VGG16(include_top=False, weights='imagenet', input_shape=(*target_size, 3))
-    custom_vgg_model = Model(vgg_model.input, [vgg_model.get_layer(layer).output for layer in ["block2_conv2", "block3_conv3"]])
-    custom_vgg_model.trainable = False
-
-    return custom_vgg_model
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Train super sampling model")
     parser.add_argument("--lr", default=1e-4, type=float, help="Learning rate")
@@ -145,6 +142,7 @@ def parse_args():
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--vgg-layers", default=DEFAULT_VGG_LOSS_LAYERS, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
     parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
     parser.add_argument("--seed", default=None, type=int, help="Random seed")
