@@ -6,6 +6,8 @@ class PerceptualFPVGG16(Model):
     VGG16 wrapper with input in floating-point format (0...1) with activation outputs
     """
     def __init__(self, weights, input_shape, output_layer_names, trainable=False):
+        super().__init__()
+        
         vgg_model = VGG16(include_top=False, weights=weights, input_shape=input_shape)
         self.custom_vgg_model = Model(vgg_model.input, [vgg_model.get_layer(layer).output for layer in output_layer_names])
         self.custom_vgg_model.trainable = trainable
