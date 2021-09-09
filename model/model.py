@@ -7,7 +7,7 @@ from model.components.reconstruction import ReconstructionModule4X
 from model.components.extraction import FeatureExtractionModule
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, upsize_type, warp_type, frame_count=5):
+    def __init__(self, layer_config, upsize_type, warp_type, frame_count=5):
         super().__init__()
 
         assert warp_type in ["single", "acc", "accfast"], "Invalid warp_type. Supported values: single, acc, accfast"
@@ -22,7 +22,7 @@ class SuperSamplingModel(tf.keras.Model):
             self.backward_warping = AccumulativeBackwardWarpFast()
         else:
             self.backward_warping = AccumulativeBackwardWarp()
-        self.reconstruction = ReconstructionModule4X(frame_count=frame_count, upsize_type=upsize_type)
+        self.reconstruction = ReconstructionModule4X(frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type)
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
         super(SuperSamplingModel, self).compile(*args, **kwargs)
@@ -71,10 +71,10 @@ class SuperSamplingModel(tf.keras.Model):
 
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
-            rec_maps = self.perceptual_loss_model(reconstructions)
-            target_maps = self.perceptual_loss_model(targets)
-            p_loss = self.perceptual_loss(target_maps, rec_maps)
             reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+            rec_maps = self.perceptual_loss_model(reconstructions_clipped)
+            target_maps = self.perceptual_loss_model(targets, training=False)
+            p_loss = self.perceptual_loss(target_maps, rec_maps)
             loss = self.compiled_loss(
                 targets, reconstructions_clipped,
                 regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
@@ -92,10 +92,10 @@ class SuperSamplingModel(tf.keras.Model):
         assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
 
         reconstructions = self(inputs, training=False)
-        rec_maps = self.perceptual_loss_model(reconstructions)
+        reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+        rec_maps = self.perceptual_loss_model(reconstructions_clipped)
         target_maps = self.perceptual_loss_model(targets)
         p_loss = self.perceptual_loss(target_maps, rec_maps)
-        reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
 
         self.compiled_loss(
             targets, reconstructions_clipped,

@@ -1,7 +1,10 @@
 import os
 from glob import glob
 import tensorflow as tf
+from tensorflow.python.tf2 import enable
 import tensorflow_io as tfio
+
+from model.utils import tf_minor_version_geq
 
 COLOR_ID = "COLOR"
 DEPTH_ID = "DEPTH"
@@ -12,12 +15,11 @@ class RGBDMotionDataset:
         self, root_dir, lr_subdir, hr_subdir, 
         frames_per_rec=60, 
         frames_per_sample=5, 
-        image_patch_size=(120, 120), 
-        image_patch_step=(60, 60), 
-        target_patch_size=(480, 480),
-        target_patch_step=(240, 240)
+        image_patch_size=None, 
+        image_patch_step=None, 
+        target_patch_size=None,
+        target_patch_step=None
     ):
-        assert(len(image_patch_size) == 2)
         self.image_patch_size = image_patch_size
         self.image_patch_step = image_patch_step
         self.target_patch_size = target_patch_size
@@ -28,7 +30,29 @@ class RGBDMotionDataset:
         self.lr_subdir = lr_subdir
         self.hr_subdir = hr_subdir
 
-    def _image_seq_map_func(self, rec_subdir, indices):
+    def _discover_image_sizes(self):
+        paths = glob(os.path.join(self.root_dir, "*"))
+        if len(paths) == 0:
+            raise ValueError("Root dataset dir empty!")
+        
+        first_rec_dir = paths[0]
+        lr_dir = os.path.join(first_rec_dir, self.lr_subdir)
+        hr_dir = os.path.join(first_rec_dir, self.hr_subdir)
+        lr_png_files = glob(os.path.join(lr_dir, "*.png"))
+        hr_png_files = glob(os.path.join(hr_dir, "*.png"))
+        if len(lr_png_files) == 0:
+            raise ValueError("Low resolution dir is missing png files!")
+        if len(hr_png_files) == 0:
+            raise ValueError("High resolution dir is missing png files!")
+        
+        lr_image = tf.image.decode_png(tf.io.read_file(lr_png_files[0]))
+        hr_image = tf.image.decode_png(tf.io.read_file(hr_png_files[0]))
+        return (
+            tuple(tf.shape(lr_image)[:-1].numpy()),
+            tuple(tf.shape(hr_image)[:-1].numpy())
+        )
+
+    def _image_seq_map_func(self, rec_subdir, indices, enable_patches):
         rec_name = os.path.basename(rec_subdir)
         lr_color_paths = [
             os.path.join(self.root_dir, rec_subdir, self.lr_subdir, f"{rec_name}.{self.lr_subdir}.{COLOR_ID}.{i}.png") 
@@ -72,20 +96,28 @@ class RGBDMotionDataset:
             axis=0
         )
 
-        x = [
-            self._create_image_patches(tf.stack(lr_color_tensors)), 
-            self._create_image_patches(tf.stack(lr_depth_tensors)), 
-            self._create_image_patches(tf.stack(lr_motion_tensors))
-        ]
-        y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode='target'), axis=[1])
+        if enable_patches:
+            x = [
+                self._create_image_patches(tf.stack(lr_color_tensors)), 
+                self._create_image_patches(tf.stack(lr_depth_tensors)), 
+                self._create_image_patches(tf.stack(lr_motion_tensors))
+            ]
+            y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode='target'), axis=[1])
+        else:
+            x = [
+                tf.expand_dims(tf.stack(lr_color_tensors), axis=0),
+                tf.expand_dims(tf.stack(lr_depth_tensors), axis=0),
+                tf.expand_dims(tf.stack(lr_motion_tensors), axis=0)
+            ]
+            y = hr_color_tensor
 
         return (*x, y)
 
-    def _create_image_patches(self, tensors, mode='input'):
-        if mode == 'input':
+    def _create_image_patches(self, tensors, mode="input"):
+        if mode == "input":
             kernel = (1, self.image_patch_size[0], self.image_patch_size[1], 1)
             strides = (1, self.image_patch_step[0], self.image_patch_step[1], 1)
-        elif mode == 'target':
+        elif mode == "target":
             kernel = (1, self.target_patch_size[0], self.target_patch_size[1], 1)
             strides = (1, self.target_patch_step[0], self.target_patch_step[1], 1)
         else:
@@ -98,13 +130,25 @@ class RGBDMotionDataset:
         
         return patches # shape is: [patch_count, batch_size, height, width, channels]
 
-    def _frame_indices(self):
+    def _frame_indices(self, overlap_mode):
         indices = []
-        for i in range(self.frames_per_sample, self.frames_per_rec + 1):
+        step = None
+        if isinstance(overlap_mode, str):
+            step = 1 if overlap_mode == "all" else self.frames_per_sample # none
+        elif isinstance(overlap_mode, int):
+            step = overlap_mode
+
+        for i in range(self.frames_per_sample, self.frames_per_rec + 1, step):
             indices.append(list(range(i - self.frames_per_sample, i)))
+
         return indices
 
-    def tf_dataset(self, split_fraction=None, take_top=False, use_keras_input_mapping=False):
+    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False, create_patches=True):
+        if isinstance(seq_frame_overlap_mode, str):
+            assert seq_frame_overlap_mode in ["all", "none"], "seq_frame_overlap_mode possible string values overlap_all, overlap_none"
+        elif isinstance(seq_frame_overlap_mode, int):
+            assert seq_frame_overlap_mode in range(1, self.frames_per_sample + 1), "seq_frame_overlap_mode integer value must be in range 1...frames_per_sample"
+
         rec_paths = glob(os.path.join(self.root_dir, "*"))
         rec_paths = [path for path in rec_paths if os.path.isdir(path)]
         if split_fraction is not None:
@@ -118,26 +162,32 @@ class RGBDMotionDataset:
 
         def image_generator():
             for path in rec_paths:
-                for ids in self._frame_indices():
-                    samples = self._image_seq_map_func(path, ids)
+                for ids in self._frame_indices(seq_frame_overlap_mode):
+                    samples = self._image_seq_map_func(path, ids, create_patches)
                     yield samples
+
+        if not create_patches:
+            input_patch_size, target_patch_size = self._discover_image_sizes()
+        elif self.image_patch_size is not None or self.target_patch_size is not None:
+            input_patch_size, target_patch_size = self.image_patch_size, self.target_patch_size
+        else:
+            raise ValueError("image_patch_size, target_patch_size must not be None when create_patches is False")
         
-        version = tf.__version__.split(".")
-        if int(version[1]) >= 5:
+        if tf_minor_version_geq(5):
             dataset = tf.data.Dataset.from_generator(
                 image_generator,
                 output_signature=(
                     tf.TensorSpec(
-                        shape=(None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 3), dtype=tf.float32
+                        shape=(None, self.frames_per_sample, input_patch_size[0], input_patch_size[1], 3), dtype=tf.float32
                     ),
                     tf.TensorSpec(
-                        shape=(None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 1), dtype=tf.float32
+                        shape=(None, self.frames_per_sample, input_patch_size[0], input_patch_size[1], 1), dtype=tf.float32
                     ),
                     tf.TensorSpec(
-                        shape=(None, self.frames_per_sample - 1, self.image_patch_size[0], self.image_patch_size[1], 2), dtype=tf.float32
+                        shape=(None, self.frames_per_sample - 1, input_patch_size[0], input_patch_size[1], 2), dtype=tf.float32
                     ),
                     tf.TensorSpec(
-                        shape=(None, self.target_patch_size[0], self.target_patch_size[1], 3), dtype=tf.float32
+                        shape=(None, target_patch_size[0], target_patch_size[1], 3), dtype=tf.float32
                     )
                 )
             )
@@ -146,10 +196,10 @@ class RGBDMotionDataset:
                 image_generator,
                 output_types=(tf.float32, tf.float32, tf.float32, tf.float32),
                 output_shapes=(
-                    (None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 3),
-                    (None, self.frames_per_sample, self.image_patch_size[0], self.image_patch_size[1], 1),
-                    (None, self.frames_per_sample - 1, self.image_patch_size[0], self.image_patch_size[1], 2),
-                    (None, self.target_patch_size[0], self.target_patch_size[1], 3)
+                    (None, self.frames_per_sample, input_patch_size[0], input_patch_size[1], 3),
+                    (None, self.frames_per_sample, input_patch_size[0], input_patch_size[1], 1),
+                    (None, self.frames_per_sample - 1, input_patch_size[0], input_patch_size[1], 2),
+                    (None, target_patch_size[0], target_patch_size[1], 3)
                 )
             )
 
