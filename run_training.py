@@ -4,8 +4,6 @@ import os
 import argparse
 import tensorflow as tf 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
 
 from model.model import SuperSamplingModel
@@ -13,8 +11,11 @@ from model.loss import PerceptualLoss, SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
 from model.utils import tf_minor_version_geq
+from model.vgg import PerceptualFPVGG16
 
 UPSAMPLING_FACTOR = 4
+DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
+
 
 def main(args):
     if args.debug:
@@ -32,6 +33,8 @@ def main(args):
             tf.keras.mixed_precision.set_global_policy("mixed_float16")
         else:
             tf.keras.mixed_precision.experimental.set_policy("mixed_float16")
+    if args.seed is not None:
+        tf.random.set_seed(args.seed)
     
     # create output dirs for checkpoint and logs
     os.makedirs(os.path.dirname(args.checkpoint_dir), exist_ok=True)
@@ -56,10 +59,10 @@ def main(args):
     train_fraction = 1 - args.data_val_fraction
     train_dataset = dataset_factory.tf_dataset(
         seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
+    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle, seed=args.seed).prefetch(buffer_size=args.buffer_prefetch)
     val_dataset = dataset_factory.tf_dataset(
         seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
+    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle, seed=args.seed).prefetch(buffer_size=args.buffer_prefetch)
 
     model = SuperSamplingModel(
         layer_config=args.rec_layer_config, 
@@ -67,7 +70,11 @@ def main(args):
         warp_type=args.warp_type
     )
     optimizer = Adam(learning_rate=args.lr)
-    perceptual_model = perceptual_vgg_model(target_size)
+    perceptual_model = PerceptualFPVGG16(
+        weights="imagenet",
+        input_shape=(*target_size, 3),
+        output_layer_names=args.vgg_layers
+    )
     perceptual_loss = PerceptualLoss()
     ssim_loss = SSIMLoss()
     model.compile(
@@ -78,6 +85,7 @@ def main(args):
         loss=ssim_loss,
         metrics=[psnr, ssim]
     )
+
     if args.weights_path is not None and len(args.weights_path) != 0:
         input_element_spec = train_dataset.element_spec[0]
         dummy_data = dict()
@@ -87,9 +95,10 @@ def main(args):
             dummy_data[key] = dummy_tensor
         _ = model(dummy_data)
         model.load_weights(args.weights_path)
+    
     callbacks = [
         TensorBoard(log_dir=args.log_dir),
-        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=not args.save_model)
+        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
     ]
     if args.lr_decay is not None:
         def drop_step_decay(epoch):
@@ -101,6 +110,7 @@ def main(args):
         callbacks.append(
             LearningRateScheduler(drop_step_decay)
         )
+    
     model.fit(
         train_dataset,
         epochs=args.epochs,
@@ -108,14 +118,6 @@ def main(args):
         callbacks=callbacks,
         validation_data=val_dataset
     )
-
-
-def perceptual_vgg_model(target_size):
-    vgg_model = VGG16(include_top=False, weights='imagenet', input_shape=(*target_size, 3))
-    custom_vgg_model = Model(vgg_model.input, [vgg_model.get_layer(layer).output for layer in ["block2_conv2", "block3_conv3"]])
-    custom_vgg_model.trainable = False
-
-    return custom_vgg_model
 
 
 def parse_args():
@@ -139,9 +141,10 @@ def parse_args():
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--vgg-layers", default=DEFAULT_VGG_LOSS_LAYERS, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
     parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
-    parser.add_argument("--save-model", action="store_true", help="Save whole model, not only weights")
+    parser.add_argument("--seed", default=None, type=int, help="Random seed")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
     parser.add_argument("--no-tf32", action="store_true", help="Disable tensor float 32 support")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
