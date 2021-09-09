@@ -12,6 +12,9 @@ class PerceptualFPVGG16(Model):
         self.trainable = trainable
     
     def call(self, x):
+        """
+        x is expected in float image format, that is 0...1 range of values
+        """
         scaled_x = x * 255.0
         preprocessed_x = preprocess_input(scaled_x)
         output = self.custom_vgg_model(preprocessed_x)

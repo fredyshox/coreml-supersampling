@@ -4,10 +4,7 @@ import os
 import argparse
 import tensorflow as tf 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
-from tensorflow.python.keras.utils.generic_utils import default
 
 from model.model import SuperSamplingModel
 from model.loss import PerceptualLoss, SSIMLoss
@@ -18,6 +15,7 @@ from model.vgg import PerceptualFPVGG16
 
 UPSAMPLING_FACTOR = 4
 DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
+
 
 def main(args):
     if args.debug:
@@ -75,7 +73,7 @@ def main(args):
     perceptual_model = PerceptualFPVGG16(
         weights="imagenet",
         input_shape=(*target_size, 3),
-        output_layer_names=["block2_conv2", "block3_conv3"]
+        output_layer_names=args.vgg_layers
     )
     perceptual_loss = PerceptualLoss()
     ssim_loss = SSIMLoss()
@@ -120,6 +118,7 @@ def main(args):
         callbacks=callbacks,
         validation_data=val_dataset
     )
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train super sampling model")
