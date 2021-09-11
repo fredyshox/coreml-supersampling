@@ -1,3 +1,4 @@
+import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
 
@@ -17,8 +18,10 @@ class PerceptualFPVGG16(Model):
         """
         x is expected in float image format, that is 0...1 range of values
         """
-        scaled_x = x * 255.0
-        preprocessed_x = preprocess_input(scaled_x)
+        #scaled_x = x * 255.0
+        #preprocessed_x = preprocess_input(scaled_x)
+        # just convert to BGR
+        preprocessed_x = tf.reverse(x, axis=[-1])
         output = self.custom_vgg_model(preprocessed_x)
 
         return output
