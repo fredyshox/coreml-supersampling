@@ -20,5 +20,6 @@ class PerceptualFPVGG16(Model):
         scaled_x = x * 255.0
         preprocessed_x = preprocess_input(scaled_x)
         output = self.custom_vgg_model(preprocessed_x)
+        standardized_output = (output - 90.10304260253906) / 40.430442810058594
 
-        return output
+        return standardized_output
