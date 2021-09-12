@@ -36,6 +36,7 @@ def main(args):
 
     input_element_spec = dataset.element_spec[1]
     input_shape = input_element_spec.shape[-3:]
+    results = []
     for layer in args.vgg_layers:
         print(f"==> Stats for layer: {layer}")
         model = PerceptualFPVGG16("imagenet", input_shape, [layer])
@@ -48,6 +49,21 @@ def main(args):
         n, mean, variance = online_welford_mean_var(generator())
         stddev = tf.sqrt(variance)
         print(f"==> n: {n}, mean: {mean}, variance: {variance}, stddev: {stddev}")
+        results.append((layer, n, mean, variance, stddev))
+    
+    if args.clearml:
+        import clearml
+        log_clearml(results)
+
+
+def log_clearml(data):
+    header = ["layer", "n", "mean", "variance", "stardard deviation"]
+    rows = [header] + [list(row) for row in data]
+    clearml.Logger.current_logger().report_table(
+        "VGG activation stats",
+        "n/mean/var/stddev",
+        table_plot=rows
+    )
 
 
 def parse_args():
@@ -60,6 +76,7 @@ def parse_args():
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
+    parser.add_argument("--clearml", action="store_true", help="Use clearml for logging")
 
     args = parser.parse_args()
     return args 
