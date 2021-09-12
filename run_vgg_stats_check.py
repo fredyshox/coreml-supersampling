@@ -87,7 +87,7 @@ def main(args):
         n, mean, variance = online_welford_mean_var(generator())
         stddev = tf.sqrt(variance)
         print(f"==> n: {n}, mean: {mean}, variance: {variance}, stddev: {stddev}")
-        results.append((layer, n, mean, variance, stddev))
+        results.append((layer, int(n), float(mean), float(variance), float(stddev)))
     
     if args.clearml:
         log_clearml(results)
