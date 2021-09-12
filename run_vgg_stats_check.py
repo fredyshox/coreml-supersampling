@@ -59,6 +59,7 @@ def create_dataset(args):
 
 
 def log_clearml(data):
+    import clearml
     header = ["layer", "n", "mean", "variance", "stardard deviation"]
     rows = [header] + [list(row) for row in data]
     clearml.Logger.current_logger().report_table(
@@ -89,7 +90,6 @@ def main(args):
         results.append((layer, n, mean, variance, stddev))
     
     if args.clearml:
-        import clearml
         log_clearml(results)
 
 
