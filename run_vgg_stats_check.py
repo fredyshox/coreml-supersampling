@@ -36,13 +36,17 @@ def create_dataset(args):
             patch_step[0] * UPSAMPLING_FACTOR,
             patch_step[1] * UPSAMPLING_FACTOR
         )
+    seq_overlap_mode = args.data_seq_overlap_mode
+    if seq_overlap_mode.isnumeric():
+        seq_overlap_mode = int(seq_overlap_mode)
+
     dataset_factory = RGBDMotionDataset(
         args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir,
         image_patch_size=args.patch_size, image_patch_step=args.patch_step,
         target_patch_size=target_size, target_patch_step=target_step
     )
     dataset = dataset_factory.tf_dataset(
-        seq_frame_overlap_mode="all", 
+        seq_frame_overlap_mode=seq_overlap_mode,
         use_keras_input_mapping=True, 
         create_patches=(patch_size is not None)
     )
@@ -95,6 +99,7 @@ def parse_args():
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-limit", default=None, type=int, help="Dataset sample limit")
+    parser.add_argument("--data-seq-overlap-mode", default="all", help="Dataset frame sequence overlap strategory (all, none, [0-9])")
     parser.add_argument("--patch-size", default=None, action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=None, action="store", type=int, nargs=2, help="Image patch step")
     parser.add_argument("--vgg-layers", required=True, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
