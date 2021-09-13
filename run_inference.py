@@ -64,10 +64,9 @@ def main(args):
 def parse_data_fraction(fraction):
     if fraction is not None:
         frac_num = float(fraction)
-        if abs(frac_num) > 1.0:
-            raise ValueError("data-fraction must be in range -1...1")
-        take_top = frac_num < 0
-        return abs(frac_num), take_top
+        if frac_num < 0 or frac_num > 1.0:
+            raise ValueError("data-fraction must be in range 0...1")
+        return frac_num, True
     else:
         return None, False
 
@@ -88,7 +87,7 @@ def parse_args():
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
-    parser.add_argument("--data-fraction", default=None, type=float, help="Dataset fraction (can be negative)") # FIXME imo desc is not good 
+    parser.add_argument("--data-fraction", default=None, type=float, help="Dataset lower bound in fraction (0...1)") 
     parser.add_argument("--data-limit", default=None, type=int, help="Dataset sample limit")
     parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--output-dir", required=True, help="Output directory")
