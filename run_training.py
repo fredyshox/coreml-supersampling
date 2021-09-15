@@ -18,7 +18,49 @@ UPSAMPLING_FACTOR = 4
 DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
 
 
-def main(args):
+def create_datasets(args):
+    seq_overlap_mode = args.data_seq_overlap_mode
+    if seq_overlap_mode.isnumeric():
+        seq_overlap_mode = int(seq_overlap_mode)
+
+    target_size = (
+        args.patch_size[0] * UPSAMPLING_FACTOR, 
+        args.patch_size[1] * UPSAMPLING_FACTOR
+    )
+    target_step = (
+        args.patch_step[0] * UPSAMPLING_FACTOR,
+        args.patch_step[1] * UPSAMPLING_FACTOR
+    )
+
+    dataset_factory = RGBDMotionDataset(
+        args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir,
+        image_patch_size=args.patch_size, image_patch_step=args.patch_step,
+        target_patch_size=target_size, target_patch_step=target_step
+    )
+
+    train_fraction = 1 - args.data_val_fraction
+    train_dataset = dataset_factory.tf_dataset(
+        seq_frame_overlap_mode=seq_overlap_mode, 
+        split_fraction=train_fraction, 
+        use_keras_input_mapping=True
+    )
+    train_dataset = train_dataset.batch(args.batch) \
+        .shuffle(buffer_size=args.buffer_shuffle, seed=args.seed) \
+        .prefetch(buffer_size=args.buffer_prefetch)
+    val_dataset = dataset_factory.tf_dataset(
+        seq_frame_overlap_mode=seq_overlap_mode, 
+        split_fraction=train_fraction, 
+        take_top=True, 
+        use_keras_input_mapping=True
+    )
+    val_dataset = val_dataset.batch(args.batch) \
+        .shuffle(buffer_size=args.buffer_shuffle, seed=args.seed) \
+        .prefetch(buffer_size=args.buffer_prefetch)
+
+    return (train_dataset, val_dataset, target_size, target_step)
+
+
+def toggle_global_options(args):
     if args.debug:
         gpu_devices = tf.config.get_visible_devices("GPU")
         try: 
@@ -36,35 +78,9 @@ def main(args):
             tf.keras.mixed_precision.experimental.set_policy("mixed_float16")
     if args.seed is not None:
         tf.random.set_seed(args.seed)
-    
-    # create output dirs for checkpoint and logs
-    os.makedirs(os.path.dirname(args.checkpoint_dir), exist_ok=True)
-    os.makedirs(args.log_dir, exist_ok=True)
-    
-    seq_overlap_mode = args.data_seq_overlap_mode
-    if seq_overlap_mode.isnumeric():
-        seq_overlap_mode = int(seq_overlap_mode)
-    target_size = (
-        args.patch_size[0] * UPSAMPLING_FACTOR, 
-        args.patch_size[1] * UPSAMPLING_FACTOR
-    )
-    target_step = (
-        args.patch_step[0] * UPSAMPLING_FACTOR,
-        args.patch_step[1] * UPSAMPLING_FACTOR
-    )
-    dataset_factory = RGBDMotionDataset(
-        args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir,
-        image_patch_size=args.patch_size, image_patch_step=args.patch_step,
-        target_patch_size=target_size, target_patch_step=target_step
-    )
-    train_fraction = 1 - args.data_val_fraction
-    train_dataset = dataset_factory.tf_dataset(
-        seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle, seed=args.seed).prefetch(buffer_size=args.buffer_prefetch)
-    val_dataset = dataset_factory.tf_dataset(
-        seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
-    ).batch(args.batch).shuffle(buffer_size=args.buffer_shuffle, seed=args.seed).prefetch(buffer_size=args.buffer_prefetch)
 
+
+def create_or_load_model(args, dataset, target_size):
     model = SuperSamplingModel(
         layer_config=args.rec_layer_config, 
         upsize_type=args.rec_upsize_type, 
@@ -87,8 +103,10 @@ def main(args):
         metrics=[psnr, ssim]
     )
 
+    # load model if weights path is provided
     if args.weights_path is not None and len(args.weights_path) != 0:
-        input_element_spec = train_dataset.element_spec[0]
+        # call model with some dummy data to force tf into building it
+        input_element_spec = dataset.element_spec[0]
         dummy_data = dict()
         for key in ["color", "depth", "motion"]:
             shape = input_element_spec[key].shape
@@ -96,7 +114,11 @@ def main(args):
             dummy_data[key] = dummy_tensor
         _ = model(dummy_data)
         model.load_weights(args.weights_path)
-    
+
+    return model 
+
+
+def create_callbacks(args, val_dataset):
     callbacks = [
         TensorBoard(log_dir=args.log_dir),
         ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True),
@@ -112,6 +134,20 @@ def main(args):
         callbacks.append(
             LearningRateScheduler(drop_step_decay)
         )
+
+    return callbacks
+
+
+def main(args):
+    toggle_global_options(args)
+    
+    # create output dirs for checkpoint and logs
+    os.makedirs(os.path.dirname(args.checkpoint_dir), exist_ok=True)
+    os.makedirs(args.log_dir, exist_ok=True)
+    
+    train_dataset, val_dataset, target_size, _ = create_datasets(args)
+    model = create_or_load_model(args, train_dataset, target_size)
+    callbacks = create_callbacks(args, val_dataset)
     
     model.fit(
         train_dataset,
