@@ -7,11 +7,12 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
 
 from model.model import SuperSamplingModel
-from model.loss import PerceptualLoss, SSIMLoss
+from model.loss import PerceptualLossMSE, SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
-from model.utils import tf_minor_version_geq
 from model.vgg import PerceptualFPVGG16
+from model.callbacks import DebugSamplesCallback
+from model.utils import tf_minor_version_geq
 
 UPSAMPLING_FACTOR = 4
 DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
@@ -75,7 +76,7 @@ def main(args):
         input_shape=(*target_size, 3),
         output_layer_names=args.vgg_layers
     )
-    perceptual_loss = PerceptualLoss()
+    perceptual_loss = PerceptualLossMSE()
     ssim_loss = SSIMLoss()
     model.compile(
         perceptual_loss=perceptual_loss, 
@@ -98,7 +99,8 @@ def main(args):
     
     callbacks = [
         TensorBoard(log_dir=args.log_dir),
-        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True)
+        ModelCheckpoint(filepath=args.checkpoint_dir, save_weights_only=True),
+        DebugSamplesCallback(log_dir=args.log_dir, dataset=val_dataset)
     ]
     if args.lr_decay is not None:
         def drop_step_decay(epoch):
