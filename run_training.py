@@ -7,7 +7,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
 
 from model.model import SuperSamplingModel
-from model.loss import PerceptualLossMSE, SSIMLoss
+from model.loss import PerceptualLossMSE, SSIMLoss, MixL1SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
 from model.vgg import PerceptualFPVGG16
@@ -95,13 +95,13 @@ def create_or_load_model(args, dataset, target_size):
         scale=args.vgg_norm_scale
     )
     perceptual_loss = PerceptualLossMSE()
-    ssim_loss = SSIMLoss()
+    mix_loss = MixL1SSIMLoss(0.8)
     model.compile(
         perceptual_loss=perceptual_loss, 
         perceptual_loss_model=perceptual_model,
         perceptual_loss_weight=args.p_loss_weight,
         optimizer=optimizer,
-        loss=ssim_loss,
+        loss=mix_loss,
         metrics=[psnr, ssim]
     )
 

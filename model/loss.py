@@ -10,6 +10,18 @@ class SSIMLoss(Loss):
         return ssim_loss
 
 
+class MixL1SSIMLoss(Loss):
+    def __init__(self, w, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+        self.w = w
+
+    def call(self, y_true, y_pred):
+        ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
+        l1_loss = tf.keras.losses.mean_absolute_error(y_true, y_pred)
+        combined = self.w * ssim_loss + (1 - self.w) * l1_loss
+        return combined
+
+
 class _BasePerceptualLoss(Loss):
     def __init__(self, reduction=Reduction.AUTO, name=None):
         super().__init__(reduction=reduction, name=name)
