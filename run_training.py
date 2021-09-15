@@ -90,7 +90,9 @@ def create_or_load_model(args, dataset, target_size):
     perceptual_model = PerceptualFPVGG16(
         weights="imagenet",
         input_shape=(*target_size, 3),
-        output_layer_names=args.vgg_layers
+        output_layer_names=args.vgg_layers,
+        loc=args.vgg_norm_loc,
+        scale=args.vgg_norm_scale
     )
     perceptual_loss = PerceptualLossMSE()
     ssim_loss = SSIMLoss()
@@ -180,6 +182,8 @@ def parse_args():
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--vgg-layers", default=DEFAULT_VGG_LOSS_LAYERS, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
+    parser.add_argument("--vgg-norm-loc", default=0.0, type=float, help="Mean value used for vgg activation standardization (use 0.0 to disable)")
+    parser.add_argument("--vgg-norm-scale", default=1.0, type=float, help="Standard deviation used for vgg activation standardization (use 1.0 to disable)")
     parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
     parser.add_argument("--seed", default=None, type=int, help="Random seed")
