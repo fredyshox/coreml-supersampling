@@ -17,7 +17,10 @@ class MixL1SSIMLoss(Loss):
 
     def call(self, y_true, y_pred):
         ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
-        l1_loss = tf.keras.losses.mean_absolute_error(y_true, y_pred)
+        l1_loss = tf.reduce_mean(
+            tf.abs(tf.subtract(y_true, y_pred)),
+            axis=tf.range(1, 4)
+        )
         combined = self.w * ssim_loss + (1 - self.w) * l1_loss
         return combined
 
