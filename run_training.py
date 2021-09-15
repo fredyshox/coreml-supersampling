@@ -5,6 +5,7 @@ import argparse
 import tensorflow as tf 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
+from tensorflow.keras.losses import MeanAbsoluteError
 
 from model.model import SuperSamplingModel
 from model.loss import PerceptualLossMSE, SSIMLoss
@@ -95,13 +96,13 @@ def create_or_load_model(args, dataset, target_size):
         scale=args.vgg_norm_scale
     )
     perceptual_loss = PerceptualLossMSE()
-    ssim_loss = SSIMLoss()
+    l1_loss = MeanAbsoluteError()
     model.compile(
         perceptual_loss=perceptual_loss, 
         perceptual_loss_model=perceptual_model,
         perceptual_loss_weight=args.p_loss_weight,
         optimizer=optimizer,
-        loss=ssim_loss,
+        loss=l1_loss,
         metrics=[psnr, ssim]
     )
 
