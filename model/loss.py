@@ -9,8 +9,8 @@ class YUV_SSIMLoss(Loss):
     def call(self, y_true, y_pred):
         yuv_y_true = tf.image.rgb_to_yuv(y_true)
         yuv_y_pred = tf.image.rgb_to_yuv(y_pred)
-        y_y_true = yuv_y_true[:, :, :, 0]
-        y_y_pred = yuv_y_pred[:, :, :, 0]
+        y_y_true = yuv_y_true[:, :, :, :1]
+        y_y_pred = yuv_y_pred[:, :, :, :1]
 
         ssim_loss = 1 - tf.image.ssim(y_y_pred, y_y_true, 1.0)
         return ssim_loss
@@ -24,8 +24,8 @@ class YUV_MixL2SSIMLoss(Loss):
     def call(self, y_true, y_pred):
         yuv_y_true = tf.image.rgb_to_yuv(y_true)
         yuv_y_pred = tf.image.rgb_to_yuv(y_pred)
-        y_y_true = yuv_y_true[:, :, :, 0]
-        y_y_pred = yuv_y_pred[:, :, :, 0]
+        y_y_true = yuv_y_true[:, :, :, :1]
+        y_y_pred = yuv_y_pred[:, :, :, :1]
         uv_y_true = yuv_y_true[:, :, :, 1:]
         uv_y_pred = yuv_y_pred[:, :, :, 1:]
 
@@ -46,8 +46,8 @@ class YUV_MixL1SSIMLoss(Loss):
     def call(self, y_true, y_pred):
         yuv_y_true = tf.image.rgb_to_yuv(y_true)
         yuv_y_pred = tf.image.rgb_to_yuv(y_pred)
-        y_y_true = yuv_y_true[:, :, :, 0]
-        y_y_pred = yuv_y_pred[:, :, :, 0]
+        y_y_true = yuv_y_true[:, :, :, :1]
+        y_y_pred = yuv_y_pred[:, :, :, :1]
         uv_y_true = yuv_y_true[:, :, :, 1:]
         uv_y_pred = yuv_y_pred[:, :, :, 1:]
 
