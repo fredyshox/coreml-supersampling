@@ -1,6 +1,65 @@
 import tensorflow as tf
 from tensorflow.keras.losses import Loss, Reduction
 
+
+class YUV_SSIMLoss(Loss):
+    def __init__(self, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+    
+    def call(self, y_true, y_pred):
+        yuv_y_true = tf.image.rgb_to_yuv(y_true)
+        yuv_y_pred = tf.image.rgb_to_yuv(y_pred)
+        y_y_true = yuv_y_true[:, :, :, 0]
+        y_y_pred = yuv_y_pred[:, :, :, 0]
+
+        ssim_loss = 1 - tf.image.ssim(y_y_pred, y_y_true, 1.0)
+        return ssim_loss
+
+
+class YUV_MixL2SSIMLoss(Loss):
+    def __init__(self, ssim_w, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+        self.w = ssim_w
+
+    def call(self, y_true, y_pred):
+        yuv_y_true = tf.image.rgb_to_yuv(y_true)
+        yuv_y_pred = tf.image.rgb_to_yuv(y_pred)
+        y_y_true = yuv_y_true[:, :, :, 0]
+        y_y_pred = yuv_y_pred[:, :, :, 0]
+        uv_y_true = yuv_y_true[:, :, :, 1:]
+        uv_y_pred = yuv_y_pred[:, :, :, 1:]
+
+        ssim_loss = 1 - tf.image.ssim(y_y_pred, y_y_true, 1.0)
+        l2_loss = tf.reduce_mean(
+            tf.square(tf.subtract(uv_y_true, uv_y_pred)),
+            axis=tf.range(1, 4)
+        )
+        combined = self.w * ssim_loss + (1 - self.w) * l2_loss
+        return combined
+
+
+class YUV_MixL1SSIMLoss(Loss):
+    def __init__(self, ssim_w, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+        self.w = ssim_w
+
+    def call(self, y_true, y_pred):
+        yuv_y_true = tf.image.rgb_to_yuv(y_true)
+        yuv_y_pred = tf.image.rgb_to_yuv(y_pred)
+        y_y_true = yuv_y_true[:, :, :, 0]
+        y_y_pred = yuv_y_pred[:, :, :, 0]
+        uv_y_true = yuv_y_true[:, :, :, 1:]
+        uv_y_pred = yuv_y_pred[:, :, :, 1:]
+
+        ssim_loss = 1 - tf.image.ssim(y_y_pred, y_y_true, 1.0)
+        l2_loss = tf.reduce_mean(
+            tf.abs(tf.subtract(uv_y_true, uv_y_pred)),
+            axis=tf.range(1, 4)
+        )
+        combined = self.w * ssim_loss + (1 - self.w) * l2_loss
+        return combined
+
+
 class SSIMLoss(Loss):
     def __init__(self, reduction=Reduction.AUTO, name=None):
         super().__init__(reduction=reduction, name=name)

@@ -9,7 +9,7 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRat
 from tensorflow.python.keras.losses import MeanAbsoluteError, MeanSquaredError
 
 from model.model import SuperSamplingModel
-from model.loss import MixL2SSIMLoss, PerceptualLossMSE, SSIMLoss, MixL1SSIMLoss
+from model.loss import PerceptualLossMSE, YUV_MixL2SSIMLoss, YUV_SSIMLoss, YUV_MixL1SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
 from model.vgg import PerceptualFPVGG16
@@ -89,7 +89,7 @@ def create_base_loss(name):
     elif name == "l2":
         return MeanSquaredError()
     elif name == "ssim":
-        return SSIMLoss()
+        return YUV_SSIMLoss()
     
     name_re = r"([a-z0-9]+)\+([a-z0-9]+)(:([01]\.[0-9]+))?"
     match = re.fullmatch(name_re, name)
@@ -102,9 +102,9 @@ def create_base_loss(name):
         weight = float(match.group(4))
     
     if "ssim" in l_names and "l1" in l_names:
-        return MixL1SSIMLoss(weight)
+        return YUV_MixL1SSIMLoss(weight)
     elif "ssim" in l_names and "l2" in l_names:
-        return MixL2SSIMLoss(weight)
+        return YUV_MixL2SSIMLoss(weight)
     else: # TODO Allow more combinations, or every possible
         raise ValueError(f"Unsupported loss function combinaion: {l_names}")
 
