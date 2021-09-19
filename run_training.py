@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import argparse
 import tensorflow as tf 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler
+from tensorflow.python.keras.losses import MeanAbsoluteError, MeanSquaredError
 
 from model.model import SuperSamplingModel
-from model.loss import PerceptualLossMSE, SSIMLoss, MixL1SSIMLoss
+from model.loss import MixL2SSIMLoss, PerceptualLossMSE, SSIMLoss, MixL1SSIMLoss
 from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
 from model.vgg import PerceptualFPVGG16
@@ -16,6 +18,7 @@ from model.utils import tf_minor_version_geq
 
 UPSAMPLING_FACTOR = 4
 DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
+DEFAULT_MIX_LOSS_SSIM_WEIGHT = 0.8
 
 
 def create_datasets(args):
@@ -80,6 +83,32 @@ def toggle_global_options(args):
         tf.random.set_seed(args.seed)
 
 
+def create_base_loss(name):
+    if name == "l1":
+        return MeanAbsoluteError()
+    elif name == "l2":
+        return MeanSquaredError()
+    elif name == "ssim":
+        return SSIMLoss()
+    
+    name_re = r"([a-z0-9]+)\+([a-z0-9]+)(:([01]\.[0-9]+))?"
+    match = re.fullmatch(name_re, name)
+    if match is None:
+        raise ValueError(f"Unsupported loss function name: {name}")
+    
+    l_names = [match.group(1), match.group(2)]
+    weight = DEFAULT_MIX_LOSS_SSIM_WEIGHT
+    if match.group(4) is not None:
+        weight = float(match.group(4))
+    
+    if "ssim" in l_names and "l1" in l_names:
+        return MixL1SSIMLoss(weight)
+    elif "ssim" in l_names and "l2" in l_names:
+        return MixL2SSIMLoss(weight)
+    else: # TODO Allow more combinations, or every possible
+        raise ValueError(f"Unsupported loss function combinaion: {l_names}")
+
+
 def create_or_load_model(args, dataset, target_size):
     model = SuperSamplingModel(
         layer_config=args.rec_layer_config, 
@@ -95,13 +124,13 @@ def create_or_load_model(args, dataset, target_size):
         scale=args.vgg_norm_scale
     )
     perceptual_loss = PerceptualLossMSE()
-    mix_loss = MixL1SSIMLoss(0.8)
+    loss = create_base_loss(args.loss)
     model.compile(
         perceptual_loss=perceptual_loss, 
         perceptual_loss_model=perceptual_model,
         perceptual_loss_weight=args.p_loss_weight,
         optimizer=optimizer,
-        loss=mix_loss,
+        loss=loss,
         metrics=[psnr, ssim]
     )
 
@@ -168,7 +197,8 @@ def parse_args():
     parser.add_argument("--checkpoint-dir", default="checkpoints/model.weights.{epoch:02d}-{val_loss:.2f}.hdf5", help="Format/filepath to save model checkpoints")
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
     parser.add_argument("--epochs", default=15, type=int, help="Number of epochs")
-    parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight")
+    parser.add_argument("--loss", default="ssim", help="Base loss function (options: l1, l2, ssim, ssim+l1, ssim+l2)")
+    parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight (0.0 if should not be used)")
     parser.add_argument("--patch-size", default=[120, 120], action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=[60, 60], action="store", type=int, nargs=2, help="Image patch step")
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")

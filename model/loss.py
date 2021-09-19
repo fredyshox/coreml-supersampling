@@ -10,10 +10,25 @@ class SSIMLoss(Loss):
         return ssim_loss
 
 
-class MixL1SSIMLoss(Loss):
-    def __init__(self, w, reduction=Reduction.AUTO, name=None):
+class MixL2SSIMLoss(Loss):
+    def __init__(self, ssim_w, reduction=Reduction.AUTO, name=None):
         super().__init__(reduction=reduction, name=name)
-        self.w = w
+        self.w = ssim_w
+
+    def call(self, y_true, y_pred):
+        ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
+        l2_loss = tf.reduce_mean(
+            tf.square(tf.subtract(y_true, y_pred)),
+            axis=tf.range(1, 4)
+        )
+        combined = self.w * ssim_loss + (1 - self.w) * l2_loss
+        return combined
+
+
+class MixL1SSIMLoss(Loss):
+    def __init__(self, ssim_w, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+        self.w = ssim_w
 
     def call(self, y_true, y_pred):
         ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
