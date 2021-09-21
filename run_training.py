@@ -14,6 +14,7 @@ from model.metrics import psnr, ssim
 from model.dataset import RGBDMotionDataset
 from model.vgg import PerceptualFPVGG16
 from model.callbacks import DebugSamplesCallback
+from model.loader import resolve_weights_uri
 from model.utils import tf_minor_version_geq
 
 UPSAMPLING_FACTOR = 4
@@ -136,6 +137,9 @@ def create_or_load_model(args, dataset, target_size):
 
     # load model if weights path is provided
     if args.weights_path is not None and len(args.weights_path) != 0:
+        weights_file_path = resolve_weights_uri(args.weights_path)
+        if args.debug:
+            print(f"Using weights at: {weights_file_path}")
         # call model with some dummy data to force tf into building it
         input_element_spec = dataset.element_spec[0]
         dummy_data = dict()
@@ -144,7 +148,7 @@ def create_or_load_model(args, dataset, target_size):
             dummy_tensor = tf.ones([args.batch, *shape[-4:]])
             dummy_data[key] = dummy_tensor
         _ = model(dummy_data)
-        model.load_weights(args.weights_path)
+        model.load_weights(weights_file_path)
 
     return model 
 
@@ -214,7 +218,7 @@ def parse_args():
     parser.add_argument("--vgg-layers", default=DEFAULT_VGG_LOSS_LAYERS, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
     parser.add_argument("--vgg-norm-loc", default=0.0, type=float, help="Mean value used for vgg activation standardization (use 0.0 to disable)")
     parser.add_argument("--vgg-norm-scale", default=1.0, type=float, help="Standard deviation used for vgg activation standardization (use 1.0 to disable)")
-    parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training)")
+    parser.add_argument("--weights-path", default=None, type=str, help="Path to file with weights to load (resume training). Can be local file path or clearml task output: `clearml://<task-id>/[<model-index>]`")
     parser.add_argument("--initial-epoch", default=0, type=int, help="Initial epoch (resume training)")
     parser.add_argument("--seed", default=None, type=int, help="Random seed")
     parser.add_argument("--amp", action="store_true", help="Enable NVIDIA Automatic Mixed Precision")
