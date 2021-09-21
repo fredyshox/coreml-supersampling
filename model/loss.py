@@ -9,7 +9,38 @@ class SSIMLoss(Loss):
         ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
         return ssim_loss
 
-class PerceptualLoss(Loss):
+
+class MixL2SSIMLoss(Loss):
+    def __init__(self, ssim_w, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+        self.w = ssim_w
+
+    def call(self, y_true, y_pred):
+        ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
+        l2_loss = tf.reduce_mean(
+            tf.square(tf.subtract(y_true, y_pred)),
+            axis=tf.range(1, 4)
+        )
+        combined = self.w * ssim_loss + (1 - self.w) * l2_loss
+        return combined
+
+
+class MixL1SSIMLoss(Loss):
+    def __init__(self, ssim_w, reduction=Reduction.AUTO, name=None):
+        super().__init__(reduction=reduction, name=name)
+        self.w = ssim_w
+
+    def call(self, y_true, y_pred):
+        ssim_loss = 1 - tf.image.ssim(y_pred, y_true, 1.0)
+        l1_loss = tf.reduce_mean(
+            tf.abs(tf.subtract(y_true, y_pred)),
+            axis=tf.range(1, 4)
+        )
+        combined = self.w * ssim_loss + (1 - self.w) * l1_loss
+        return combined
+
+
+class _BasePerceptualLoss(Loss):
     def __init__(self, reduction=Reduction.AUTO, name=None):
         super().__init__(reduction=reduction, name=name)
 
@@ -23,9 +54,23 @@ class PerceptualLoss(Loss):
 
         return perceptual_loss
 
+    def _layer_p_loss(self, pred_map, true_map):
+        raise NotImplemented()
+
+
+class PerceptualLossMSE(_BasePerceptualLoss):
     @tf.function
     def _layer_p_loss(self, pred_map, true_map):
         return tf.reduce_mean(
             tf.square(tf.subtract(pred_map, true_map)),
+            axis=tf.range(1, 4)
+        )
+ 
+        
+class PerceptualLossMAE(_BasePerceptualLoss):
+    @tf.function
+    def _layer_p_loss(self, pred_map, true_map):
+        return tf.reduce_mean(
+            tf.abs(tf.subtract(pred_map, true_map)),
             axis=tf.range(1, 4)
         )

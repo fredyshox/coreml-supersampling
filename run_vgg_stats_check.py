@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import tensorflow as tf
 from tqdm import tqdm
