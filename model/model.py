@@ -22,7 +22,10 @@ class SuperSamplingModel(tf.keras.Model):
             self.backward_warping = AccumulativeBackwardWarpFast()
         else:
             self.backward_warping = AccumulativeBackwardWarp()
-        self.reconstruction = ReconstructionModule4X(frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type)
+        self.reconstruction = ReconstructionModule4X(
+            frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type,
+            channels_per_frame=10, output_channels=1 # YUV mod
+        )
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
         super(SuperSamplingModel, self).compile(*args, **kwargs)
@@ -37,9 +40,13 @@ class SuperSamplingModel(tf.keras.Model):
         depth_frames = inputs["depth"] # seq = frame_count
         motion_frames = inputs["motion"] # seq = frame_count - 1
 
+        yuv_frames = tf.image.rgb_to_yuv(rgb_frames)
+        y_from_frames = yuv_frames[:, :, :, :, :1]
+        uv_from_frames = yuv_frames[:, -1, :, :, 1:]
+
         previous_frame_count = self.frame_count - 1
 
-        rgbd_frames = tf.concat((rgb_frames, depth_frames), axis=4)
+        rgbd_frames = tf.concat((y_from_frames, depth_frames), axis=4)
         desired_rgbd_shape = tf.concat(([-1], tf.shape(rgbd_frames)[-3:]), axis=0) # (-1, *tf.shape(rgbd_frames)[-3:])
         flat_rgbd_frames = tf.reshape(rgbd_frames, desired_rgbd_shape)
         flat_features_frames = self.feature_extraction(flat_rgbd_frames)
@@ -60,23 +67,32 @@ class SuperSamplingModel(tf.keras.Model):
         backward_warped_features = self.backward_warping(upsampled_previous_features, upsampled_motion_vectors)
 
         upsampled_current_features = upsampled_features[:, previous_frame_count, :, :, :]
-        reconstructed_frame = self.reconstruction(upsampled_current_features, backward_warped_features)
+        reconstructed_frame_y = self.reconstruction(upsampled_current_features, backward_warped_features)
 
-        return reconstructed_frame
+        reconstruction_shape = tf.shape(reconstructed_frame_y)
+        resized_uv = tf.image.resize(uv_from_frames, (reconstruction_shape[-3], reconstruction_shape[-2]))
+        reconstructed_frame_yuv = tf.concat((reconstructed_frame_y, resized_uv), axis=3)
+
+        return reconstructed_frame_yuv
     
     @tf.function
     def train_step(self, data):
         inputs, targets = data
         assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
+        
+        ##
+        yuv_targets = tf.image.rgb_to_yuv(targets)
+        ##
 
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
             reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
-            rec_maps = self.perceptual_loss_model(reconstructions_clipped, training=False)
+            rgb_reconstructions = tf.image.yuv_to_rgb(reconstructions_clipped)
+            rec_maps = self.perceptual_loss_model(rgb_reconstructions, training=False)
             target_maps = self.perceptual_loss_model(targets, training=False)
             p_loss = self.perceptual_loss(target_maps, rec_maps)
             loss = self.compiled_loss(
-                targets, reconstructions_clipped,
+                yuv_targets, reconstructions_clipped,
                 regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
             )
         

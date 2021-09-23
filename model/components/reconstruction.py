@@ -9,7 +9,7 @@ _REC_LAYER_CONFIG_FAST = [32, 16, 32, 32, 64, 64, 32, 32, 16]
 _REC_LAYER_CONFIG_ULTRA_FAST = [16, 8, 16, 16, 32, 32, 16, 16, 8]
 
 class ReconstructionModule4X(Model):
-    def __init__(self, frame_count, layer_config="standard", upsize_type="upsample", channels_per_frame=12, name=None):
+    def __init__(self, frame_count, layer_config="standard", upsize_type="upsample", channels_per_frame=12, output_channels=3, name=None):
         super().__init__(name=name)
         assert upsize_type in ["upsample", "deconv"], "Supported upsize types are bilinear upsampling and transposed convolution"
         assert layer_config in ["standard", "fast", "ultrafast"], "Supported layer configs are standard, fast and ultrafast"
@@ -53,7 +53,7 @@ class ReconstructionModule4X(Model):
         ])
         self.decoder_1 = Sequential([
             Conv2D(layer_config[8], CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
-            Conv2D(3, CONV2D_KERNEL_SIZE, activation="relu", padding="same"),
+            Conv2D(output_channels, CONV2D_KERNEL_SIZE, activation="relu", padding="same")
         ])
 
     def _layer_config_for_name(self, name):
