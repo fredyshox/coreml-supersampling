@@ -68,6 +68,7 @@ class SuperSamplingModel(tf.keras.Model):
 
         upsampled_current_features = upsampled_features[:, previous_frame_count, :, :, :]
         reconstructed_frame_y = self.reconstruction(upsampled_current_features, backward_warped_features)
+        reconstructed_frame_y = tf.clip_by_value(reconstructed_frame_y, 0.0, 1.0)
 
         reconstruction_shape = tf.shape(reconstructed_frame_y)
         resized_uv = tf.image.resize(uv_from_frames, (reconstruction_shape[-3], reconstruction_shape[-2]))
@@ -86,19 +87,19 @@ class SuperSamplingModel(tf.keras.Model):
 
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
-            reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
-            rgb_reconstructions = tf.image.yuv_to_rgb(reconstructions_clipped)
+            # reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+            rgb_reconstructions = tf.image.yuv_to_rgb(reconstructions)
             rec_maps = self.perceptual_loss_model(rgb_reconstructions, training=False)
             target_maps = self.perceptual_loss_model(targets, training=False)
             p_loss = self.perceptual_loss(target_maps, rec_maps)
             loss = self.compiled_loss(
-                yuv_targets, reconstructions_clipped,
+                yuv_targets, reconstructions,
                 regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
             )
         
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        self.compiled_metrics.update_state(targets, reconstructions_clipped)
+        self.compiled_metrics.update_state(targets, rgb_reconstructions)
 
         return {m.name: m.result() for m in self.metrics}
 
@@ -107,16 +108,19 @@ class SuperSamplingModel(tf.keras.Model):
         inputs, targets = data
         assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
 
+        yuv_targets = tf.image.rgb_to_yuv(targets)
+
         reconstructions = self(inputs, training=False)
-        reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
-        rec_maps = self.perceptual_loss_model(reconstructions_clipped, training=False)
+        # reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
+        rgb_reconstructions = tf.image.yuv_to_rgb(reconstructions)
+        rec_maps = self.perceptual_loss_model(rgb_reconstructions, training=False)
         target_maps = self.perceptual_loss_model(targets, training=False)
         p_loss = self.perceptual_loss(target_maps, rec_maps)
 
         self.compiled_loss(
-            targets, reconstructions_clipped,
+            yuv_targets, reconstructions,
             regularization_losses=[self.perceptual_loss_weight * p_loss] # regularization_losses - losses to be added to compiled loss
         )
-        self.compiled_metrics.update_state(targets, reconstructions_clipped)
+        self.compiled_metrics.update_state(targets, rgb_reconstructions)
 
         return {m.name: m.result() for m in self.metrics} 
