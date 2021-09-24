@@ -42,6 +42,7 @@ def main(args):
     weights_file_path = resolve_weights_uri(args.weights_path)
     load_weights(model, weights_file_path, dataset)
     predictions = model.predict(dataset, verbose=1)
+    predictions = tf.image.yuv_to_rgb(predictions)
 
     images_path = os.path.join(args.output_dir, "reconstructions")
     os.makedirs(images_path, exist_ok=True)
