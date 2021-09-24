@@ -19,8 +19,9 @@ class DebugSamplesCallback(Callback):
         try:
             inputs, _ = next(self.iterator)
             preds = self.model(inputs)
+            rgb_preds = tf.image.yuv_to_rgb(preds)
             with self.file_writer.as_default():
-                tf.summary.image("Reconstructions", preds, step=epoch, max_outputs=self.n_images_per_epoch)
+                tf.summary.image("Reconstructions", rgb_preds, step=epoch, max_outputs=self.n_images_per_epoch)
                 self.file_writer.flush()
         except StopIteration:
             if fail_on_exhausted_dataset:
