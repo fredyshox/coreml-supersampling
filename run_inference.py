@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from model.model import SuperSamplingModel
 from model.dataset import RGBDMotionDataset
+from model.loader import resolve_weights_uri
 
 UPSAMPLING_FACTOR = 4
 DEBUG_SAMPLE_COUNT = 8
@@ -38,7 +39,8 @@ def main(args):
         upsize_type=args.rec_upsize_type, 
         warp_type=args.warp_type
     )
-    load_weights(model, args.weights_path, dataset)
+    weights_file_path = resolve_weights_uri(args.weights_path)
+    load_weights(model, weights_file_path, dataset)
     predictions = model.predict(dataset, verbose=1)
 
     images_path = os.path.join(args.output_dir, "reconstructions")
@@ -89,7 +91,7 @@ def parse_args():
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-fraction", default=None, type=float, help="Dataset lower bound in fraction (0...1)") 
     parser.add_argument("--data-limit", default=None, type=int, help="Dataset sample limit")
-    parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load (resume training)")
+    parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load (resume training). Can be local file path or clearml task output: `clearml://<task-id>/[<model-index>]`")
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
