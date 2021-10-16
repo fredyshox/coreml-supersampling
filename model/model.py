@@ -7,15 +7,15 @@ from model.components.reconstruction import ReconstructionModule4X
 from model.components.extraction import FeatureExtractionModule
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, layer_config, upsize_type, warp_type, frame_count=5):
+    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, frame_count=5):
         super().__init__()
 
         assert warp_type in ["single", "acc", "accfast"], "Invalid warp_type. Supported values: single, acc, accfast"
 
         self.frame_count = frame_count
         self.feature_extraction = FeatureExtractionModule()
-        self.zero_upsampling = ZeroUpsampling(scale_factor=4)
-        self.bilinear_upsampling = UpSampling2D(size=(4, 4), interpolation='bilinear')
+        self.zero_upsampling = ZeroUpsampling(scale_factor=upsampling_factor)
+        self.bilinear_upsampling = UpSampling2D(size=(upsampling_factor, upsampling_factor), interpolation='bilinear')
         if warp_type == "single":
             self.backward_warping = BackwardWarp()
         elif warp_type == "accfast":
