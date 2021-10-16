@@ -66,7 +66,10 @@ class ReconstructionModule4X(Model):
         else:
             raise ValueError()
 
-    def call(self, current_x, previous_x):
+    def call(self, inputs):
+        tf.assert_equal(len(inputs), 2)
+
+        current_x, previous_x = inputs
         # axis 3, channel-wise
         flat_prev_channel_count = (self.frame_count - 1) * self.channels_per_frame
         desired_flat_shape = tf.concat(([-1], tf.shape(current_x)[1:][:-1], [flat_prev_channel_count]), axis=0)
