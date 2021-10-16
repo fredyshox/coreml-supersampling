@@ -17,7 +17,6 @@ from model.callbacks import DebugSamplesCallback
 from model.loader import resolve_weights_uri
 from model.utils import tf_minor_version_geq
 
-UPSAMPLING_FACTOR = 4
 DEFAULT_VGG_LOSS_LAYERS = ["block2_conv2", "block3_conv3"]
 DEFAULT_MIX_LOSS_SSIM_WEIGHT = 0.8
 
@@ -28,12 +27,12 @@ def create_datasets(args):
         seq_overlap_mode = int(seq_overlap_mode)
 
     target_size = (
-        args.patch_size[0] * UPSAMPLING_FACTOR, 
-        args.patch_size[1] * UPSAMPLING_FACTOR
+        args.patch_size[0] * args.scale_factor, 
+        args.patch_size[1] * args.scale_factor
     )
     target_step = (
-        args.patch_step[0] * UPSAMPLING_FACTOR,
-        args.patch_step[1] * UPSAMPLING_FACTOR
+        args.patch_step[0] * args.scale_factor,
+        args.patch_step[1] * args.scale_factor
     )
 
     dataset_factory = RGBDMotionDataset(
@@ -112,6 +111,7 @@ def create_base_loss(name):
 
 def create_or_load_model(args, dataset, target_size):
     model = SuperSamplingModel(
+        upsampling_factor=args.scale_factor,
         layer_config=args.rec_layer_config, 
         upsize_type=args.rec_upsize_type, 
         warp_type=args.warp_type
@@ -203,6 +203,7 @@ def parse_args():
     parser.add_argument("--epochs", default=15, type=int, help="Number of epochs")
     parser.add_argument("--loss", default="ssim", help="Base loss function (options: l1, l2, ssim, ssim+l1, ssim+l2)")
     parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight (0.0 if should not be used)")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
     parser.add_argument("--patch-size", default=[120, 120], action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=[60, 60], action="store", type=int, nargs=2, help="Image patch step")
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")

@@ -8,13 +8,11 @@ from tensorflow.keras.layers import UpSampling2D, InputLayer
 from model.dataset import RGBDMotionDataset
 from model.metrics import psnr, ssim
 
-UPSAMPLING_FACTOR = 4
 
-
-def bilinear_baseline(input_shape):
+def bilinear_baseline(input_shape, upsampling_factor):
     model = Sequential()
     model.add(InputLayer(input_shape=input_shape))
-    model.add(UpSampling2D(size=(UPSAMPLING_FACTOR, UPSAMPLING_FACTOR), interpolation="bilinear"))
+    model.add(UpSampling2D(size=(upsampling_factor, upsampling_factor), interpolation="bilinear"))
     return model
 
 
@@ -46,12 +44,12 @@ def create_datasets(args):
     if seq_overlap_mode.isnumeric():
         seq_overlap_mode = int(seq_overlap_mode)
     target_size = (
-        args.patch_size[0] * UPSAMPLING_FACTOR, 
-        args.patch_size[1] * UPSAMPLING_FACTOR
+        args.patch_size[0] * args.scale_factor, 
+        args.patch_size[1] * args.scale_factor
     )
     target_step = (
-        args.patch_step[0] * UPSAMPLING_FACTOR,
-        args.patch_step[1] * UPSAMPLING_FACTOR
+        args.patch_step[0] * args.scale_factor,
+        args.patch_step[1] * args.scale_factor
     )
     dataset_factory = RGBDMotionDataset(
         args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir,
@@ -78,7 +76,7 @@ def create_datasets(args):
 def main(args):
     train_dataset, val_dataset = create_datasets(args)
 
-    model = bilinear_baseline((args.patch_size[0], args.patch_size[1], 3))
+    model = bilinear_baseline((args.patch_size[0], args.patch_size[1], 3), args.scale_factor)
     model.compile(metrics=[psnr, ssim])
     
     train_results = model.evaluate(train_dataset, return_dict=True)
@@ -94,6 +92,7 @@ def parse_args():
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
     parser.add_argument("--patch-size", default=[120, 120], action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=[60, 60], action="store", type=int, nargs=2, help="Image patch step")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")

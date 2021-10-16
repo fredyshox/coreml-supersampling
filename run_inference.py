@@ -14,7 +14,6 @@ from model.model import SuperSamplingModel
 from model.dataset import RGBDMotionDataset
 from model.loader import resolve_weights_uri
 
-UPSAMPLING_FACTOR = 4
 DEBUG_SAMPLE_COUNT = 8
 
 
@@ -35,6 +34,7 @@ def main(args):
     ).batch(args.batch).take(args.data_limit).prefetch(args.buffer_prefetch)
 
     model = SuperSamplingModel(
+        upsampling_factor=args.scale_factor,
         layer_config=args.rec_layer_config,
         upsize_type=args.rec_upsize_type, 
         warp_type=args.warp_type
@@ -46,7 +46,7 @@ def main(args):
     images_path = os.path.join(args.output_dir, "reconstructions")
     os.makedirs(images_path, exist_ok=True)
     for i, image in tqdm(enumerate(predictions), desc="Saving predictions"):
-        image_path = os.path.join(images_path, f"{i}_{UPSAMPLING_FACTOR}x.png")
+        image_path = os.path.join(images_path, f"{i}_{args.scale_factor}x.png")
         u8_image = tf.image.convert_image_dtype(image, tf.uint8)
         image_data = tf.io.encode_png(u8_image)
         tf.io.write_file(image_path, image_data)
@@ -95,6 +95,7 @@ def parse_args():
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")

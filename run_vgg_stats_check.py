@@ -7,8 +7,6 @@ from tqdm import tqdm
 from model.dataset import RGBDMotionDataset
 from model.vgg import PerceptualFPVGG16
 
-UPSAMPLING_FACTOR = 4
-
 
 def online_welford_mean_var(gen):
     n = 0
@@ -31,12 +29,12 @@ def create_dataset(args):
         patch_size = args.patch_size
         patch_step = args.patch_step
         target_size = (
-            patch_size[0] * UPSAMPLING_FACTOR, 
-            patch_size[1] * UPSAMPLING_FACTOR
+            patch_size[0] * args.scale_factor, 
+            patch_size[1] * args.scale_factor
         )
         target_step = (
-            patch_step[0] * UPSAMPLING_FACTOR,
-            patch_step[1] * UPSAMPLING_FACTOR
+            patch_step[0] * args.scale_factor,
+            patch_step[1] * args.scale_factor
         )
     seq_overlap_mode = args.data_seq_overlap_mode
     if seq_overlap_mode.isnumeric():
@@ -104,6 +102,7 @@ def parse_args():
     parser.add_argument("--data-seq-overlap-mode", default="all", help="Dataset frame sequence overlap strategory (all, none, [0-9])")
     parser.add_argument("--patch-size", default=None, action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=None, action="store", type=int, nargs=2, help="Image patch step")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
     parser.add_argument("--vgg-layers", required=True, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
