@@ -22,7 +22,8 @@ def main(args):
         tf.config.set_visible_devices([], "GPU")
     
     dataset_factory = RGBDMotionDataset(
-        args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir
+        args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir, 
+        frames_per_sample=args.frame_count
     )
     split_fraction, take_top = parse_data_fraction(args.data_fraction)
     dataset = dataset_factory.tf_dataset(
@@ -37,7 +38,8 @@ def main(args):
         upsampling_factor=args.scale_factor,
         layer_config=args.rec_layer_config,
         upsize_type=args.rec_upsize_type, 
-        warp_type=args.warp_type
+        warp_type=args.warp_type,
+        frame_count=args.frame_count
     )
     weights_file_path = resolve_weights_uri(args.weights_path)
     load_weights(model, weights_file_path, dataset)
@@ -96,6 +98,7 @@ def parse_args():
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
     parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
+    parser.add_argument("--frame-count", default=5, type=int, help="Observed frame sequence length")
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
