@@ -37,6 +37,7 @@ def create_datasets(args):
 
     dataset_factory = RGBDMotionDataset(
         args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir,
+        frames_per_sample=args.frame_count,
         image_patch_size=args.patch_size, image_patch_step=args.patch_step,
         target_patch_size=target_size, target_patch_step=target_step
     )
@@ -114,7 +115,8 @@ def create_or_load_model(args, dataset, target_size):
         upsampling_factor=args.scale_factor,
         layer_config=args.rec_layer_config, 
         upsize_type=args.rec_upsize_type, 
-        warp_type=args.warp_type
+        warp_type=args.warp_type,
+        frame_count=args.frame_count
     )
     optimizer = Adam(learning_rate=args.lr)
     perceptual_model = PerceptualFPVGG16(
@@ -203,7 +205,6 @@ def parse_args():
     parser.add_argument("--epochs", default=15, type=int, help="Number of epochs")
     parser.add_argument("--loss", default="ssim", help="Base loss function (options: l1, l2, ssim, ssim+l1, ssim+l2)")
     parser.add_argument("--p-loss-weight", default=0.1, type=float, help="Perceptual loss weight (0.0 if should not be used)")
-    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
     parser.add_argument("--patch-size", default=[120, 120], action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=[60, 60], action="store", type=int, nargs=2, help="Image patch step")
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
@@ -213,6 +214,8 @@ def parse_args():
     parser.add_argument("--data-seq-overlap-mode", default="all", help="Dataset frame sequence overlap strategory (all, none, [0-9])")
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
+    parser.add_argument("--frame-count", default=5, type=int, help="Observed frame sequence length")
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
