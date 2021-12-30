@@ -27,7 +27,7 @@ class SuperSamplingModel(tf.keras.Model):
             self.backward_warping = AccumulativeBackwardWarp()
         self.reconstruction = ReconstructionModule4X(
             frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type,
-            channels_per_frame=10, output_channels=1 # YUV mod
+            channels_per_frame=10 if feature_extraction_enabled else 2, output_channels=1 # YUV mod
         )
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
