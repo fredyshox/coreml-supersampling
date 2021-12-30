@@ -39,6 +39,7 @@ def main(args):
         layer_config=args.rec_layer_config,
         upsize_type=args.rec_upsize_type, 
         warp_type=args.warp_type,
+        feature_extraction_enabled=not args.no_feature_extraction,
         frame_count=args.frame_count
     )
     weights_file_path = resolve_weights_uri(args.weights_path)
@@ -103,6 +104,7 @@ def parse_args():
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--no-feature-extraction", default=False, help="Disable feature extraction")
     parser.add_argument("--cpu", action="store_true", help="Use CPU even if GPU is available")
     parser.add_argument("--clearml", action="store_true", help="Use clearml storage/debug samples mechanism")
 

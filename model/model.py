@@ -7,13 +7,16 @@ from model.components.reconstruction import ReconstructionModule4X
 from model.components.extraction import FeatureExtractionModule
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, frame_count=5):
+    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, feature_extraction_enabled=True, frame_count=5):
         super().__init__()
 
         assert warp_type in ["single", "acc", "accfast"], "Invalid warp_type. Supported values: single, acc, accfast"
 
         self.frame_count = frame_count
-        self.feature_extraction = FeatureExtractionModule()
+        if feature_extraction_enabled:
+            self.feature_extraction = FeatureExtractionModule()
+        else:
+            self.feature_extraction = None
         self.zero_upsampling = ZeroUpsampling(scale_factor=upsampling_factor)
         self.bilinear_upsampling = UpSampling2D(size=(upsampling_factor, upsampling_factor), interpolation='bilinear')
         if warp_type == "single":
@@ -49,7 +52,10 @@ class SuperSamplingModel(tf.keras.Model):
         rgbd_frames = tf.concat((y_from_frames, depth_frames), axis=4)
         desired_rgbd_shape = tf.concat(([-1], tf.shape(rgbd_frames)[-3:]), axis=0) # (-1, *tf.shape(rgbd_frames)[-3:])
         flat_rgbd_frames = tf.reshape(rgbd_frames, desired_rgbd_shape)
-        flat_features_frames = self.feature_extraction(flat_rgbd_frames)
+        if self.feature_extraction is not None:
+            flat_features_frames = self.feature_extraction(flat_rgbd_frames)
+        else:
+            flat_features_frames = flat_rgbd_frames
         flat_upsampled_features = self.zero_upsampling(flat_features_frames)
         upsampled_features = tf.reshape(
             flat_upsampled_features, 

@@ -116,6 +116,7 @@ def create_or_load_model(args, dataset, target_size):
         layer_config=args.rec_layer_config, 
         upsize_type=args.rec_upsize_type, 
         warp_type=args.warp_type,
+        feature_extraction_enabled=not args.no_feature_extraction,
         frame_count=args.frame_count
     )
     optimizer = Adam(learning_rate=args.lr)
@@ -219,6 +220,7 @@ def parse_args():
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--no-feature-extraction", default=False, help="Disable feature extraction")
     parser.add_argument("--vgg-layers", default=DEFAULT_VGG_LOSS_LAYERS, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
     parser.add_argument("--vgg-norm-loc", default=0.0, type=float, help="Mean value used for vgg activation standardization (use 0.0 to disable)")
     parser.add_argument("--vgg-norm-scale", default=1.0, type=float, help="Standard deviation used for vgg activation standardization (use 1.0 to disable)")
