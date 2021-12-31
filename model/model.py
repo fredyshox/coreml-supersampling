@@ -81,8 +81,7 @@ class SuperSamplingModel(tf.keras.Model):
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
             reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
-            rgb_reconstructions = tf.image.yuv_to_rgb(reconstructions)
-            rec_maps = self.perceptual_loss_model(rgb_reconstructions, training=False)
+            rec_maps = self.perceptual_loss_model(reconstructions_clipped, training=False)
             target_maps = self.perceptual_loss_model(targets, training=False)
             p_loss = self.perceptual_loss(target_maps, rec_maps)
             loss = self.compiled_loss(
@@ -92,7 +91,7 @@ class SuperSamplingModel(tf.keras.Model):
         
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        self.compiled_metrics.update_state(targets, rgb_reconstructions)
+        self.compiled_metrics.update_state(targets, reconstructions_clipped)
 
         return {m.name: m.result() for m in self.metrics}
 
