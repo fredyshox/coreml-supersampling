@@ -85,8 +85,9 @@ class RGBDMotionDataset:
         ]
         lr_motion_tensors = [
             tf.stack(
-                [tf.cast(tfio.experimental.image.decode_exr(content, 0, "R", tf.float16), tf.float32),
-                 tf.cast(tfio.experimental.image.decode_exr(content, 0, "G", tf.float16), tf.float32)],
+                # motion vectors are read in YX format
+                [tf.cast(tfio.experimental.image.decode_exr(content, 0, "G", tf.float16), tf.float32),
+                 tf.cast(tfio.experimental.image.decode_exr(content, 0, "R", tf.float16), tf.float32)],
                 axis=2
             )
             for content in lr_motion_contents
