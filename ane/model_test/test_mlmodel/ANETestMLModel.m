@@ -9,13 +9,31 @@
 #define ANE_MODEL_SUCCESS 0x0
 #define ANE_MODEL_FAILURE 0xf
 
+void fillMultiArrayWithDummyValues(MLMultiArray* array) {
+    NSUInteger totalElemCount = 1;
+    NSUInteger channelCount = [[array.shape lastObject] unsignedIntegerValue]; 
+    for (NSNumber* n in array.shape) {
+        totalElemCount *= [n unsignedIntegerValue];
+    }
+
+    NSUInteger value = 1; 
+    for (NSUInteger i = 0; i < totalElemCount; i++) {
+        [array setObject: @((float) value) atIndexedSubscript: i];
+        value = ((value + 1) % (channelCount + 1));
+        if (value == 0) {
+            value++;
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
-        printf("Usage: %s modelpath\n", argv[0]);
+        printf("Usage: %s modelpath [logdir]\n", argv[0]);
         return 1;
     }
 
     NSURL* modelUrl = [NSURL fileURLWithPath: [NSString stringWithUTF8String: argv[1]]];
+    NSURL* logDir = (argc > 2) ? [NSURL fileURLWithPath: [NSString stringWithUTF8String: argv[2]]] : nil;
     MLModelConfiguration* config = [[MLModelConfiguration alloc] init];
     [config setComputeUnits: MLComputeUnitsAll];
     NSError* error = nil;
@@ -42,6 +60,7 @@ int main(int argc, char** argv) {
     MLMultiArray* input = [[MLMultiArray alloc] initWithShape: inputShape
                                                      dataType: inputType
                                                         error: &error];
+    fillMultiArrayWithDummyValues(input);
     if (error != nil) {
         NSLog(@"Error while initializing multiarray: %@", error.localizedDescription);
         return 4;
@@ -55,7 +74,7 @@ int main(int argc, char** argv) {
 
     dispatch_once_t reportResultOnce;
     __block int interceptorReturnValue = ANE_MODEL_FAILURE;
-    [_ANEClient swizzleInterceptorWithInputName: inputName outputName: outputName callback: ^(BOOL result){
+    [_ANEClient swizzleInterceptorWithInputName: inputName outputName: outputName logOutputDirURL: logDir callback: ^(BOOL result){
         dispatch_once(&reportResultOnce, ^{
             interceptorReturnValue = (result) ? ANE_MODEL_SUCCESS : ANE_MODEL_FAILURE;
             NSLog(@"ANE compatibility status: %d", result);
