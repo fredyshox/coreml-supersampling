@@ -9,7 +9,7 @@ _REC_LAYER_CONFIG_FAST = [32, 16, 32, 32, 64, 64, 32, 32, 16]
 _REC_LAYER_CONFIG_ULTRA_FAST = [16, 8, 16, 16, 32, 32, 16, 16, 8]
 
 class ReconstructionModule4X(Model):
-    def __init__(self, frame_count, layer_config="standard", upsize_type="upsample", channels_per_frame=12, output_channels=3, name=None):
+    def __init__(self, frame_count, layer_config, upsize_type, channels_per_frame, output_channels, name=None):
         super().__init__(name=name)
         assert upsize_type in ["upsample", "deconv"], "Supported upsize types are bilinear upsampling and transposed convolution"
         assert layer_config in ["standard", "fast", "ultrafast"], "Supported layer configs are standard, fast and ultrafast"
@@ -66,12 +66,16 @@ class ReconstructionModule4X(Model):
         else:
             raise ValueError()
 
-    def call(self, current_x, previous_x):
+    def x_tensor_from_frames(self, current_x, previous_x):
         # axis 3, channel-wise
         flat_prev_channel_count = (self.frame_count - 1) * self.channels_per_frame
         desired_flat_shape = tf.concat(([-1], tf.shape(current_x)[1:][:-1], [flat_prev_channel_count]), axis=0)
         flat_prev_x = tf.reshape(previous_x, desired_flat_shape)
         x = tf.concat([current_x, flat_prev_x], axis=3)
+
+        return x
+
+    def call(self, x):
         # encoder
         h_enc0_0 = self.encoder_0(x)
         h_enc0_1 = self.encoder_0_pooling(h_enc0_0)

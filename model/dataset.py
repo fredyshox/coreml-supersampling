@@ -1,7 +1,6 @@
 import os
 from glob import glob
 import tensorflow as tf
-from tensorflow.python.tf2 import enable
 import tensorflow_io as tfio
 
 from model.utils import tf_minor_version_geq

@@ -94,7 +94,7 @@ def parse_args():
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
     parser.add_argument("--data-fraction", default=None, type=float, help="Dataset lower bound in fraction (0...1)") 
     parser.add_argument("--data-limit", default=None, type=int, help="Dataset sample limit")
-    parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load (resume training). Can be local file path or clearml task output: `clearml://<task-id>/[<model-index>]`")
+    parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load. Can be local file path or clearml task output: `clearml://<task-id>/[<model-index>]`")
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
