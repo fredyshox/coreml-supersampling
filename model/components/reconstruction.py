@@ -11,8 +11,8 @@ _REC_LAYER_CONFIG_ULTRA_FAST = [16, 8, 16, 16, 32, 32, 16, 16, 8]
 class ReconstructionModule4X(Model):
     def __init__(self, frame_count, layer_config, upsize_type, channels_per_frame, output_channels, name=None):
         super().__init__(name=name)
-        assert upsize_type in ["upsample", "deconv"], "Supported upsize types are bilinear upsampling and transposed convolution"
-        assert layer_config in ["standard", "fast", "ultrafast"], "Supported layer configs are standard, fast and ultrafast"
+        assert upsize_type in ["upsample", "deconv"], "Supported upsize types are bilinear upsampling (upsample) and transposed convolution (deconv)"
+        assert layer_config in ["standard", "fast", "ultrafast"], "Supported layer configs are: standard, fast and ultrafast"
         
         input_shape = (None, None, frame_count * channels_per_frame)
         layer_config = self._layer_config_for_name(layer_config)
