@@ -5,7 +5,7 @@ from collections import namedtuple
 import coremltools as ct
 import tensorflow as tf
 
-from model.components.reconstruction_alt import ReconstructionModule4X
+from model.components.reconstruction import ReconstructionModule4X
 
 from ane.tests.dummy_models import *
 

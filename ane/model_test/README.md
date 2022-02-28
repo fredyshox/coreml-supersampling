@@ -30,4 +30,4 @@ Model compatiblity is evaluated by swizzling `doEvaluateDirectWithModel:options:
 | Maximum                    | :white_check_mark:     | M1 |
 | Split                      | :white_large_square:   | M1 |
 
-\* for some reason, model (or its part) does not execute on ANE at all
+\* model loads, but fails at execution
