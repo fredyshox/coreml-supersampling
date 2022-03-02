@@ -82,11 +82,20 @@ class RGBDMotionDataset:
             )
             for content in lr_depth_contents
         ]
+        offsets_norm_to_pixel_h = lambda t: t * tf.shape(t)[-1]
+        offsets_norm_to_pixel_v = lambda t: -1 * t * tf.shape(t)[-2]
         lr_motion_tensors = [
             tf.stack(
                 # motion vectors are read in YX format
-                [tf.cast(tfio.experimental.image.decode_exr(content, 0, "G", tf.float16), tf.float32),
-                 tf.cast(tfio.experimental.image.decode_exr(content, 0, "R", tf.float16), tf.float32)],
+                # these are also in noormalized coordinates: https://forum.unity.com/threads/what-are-motion-vectors.1024924/
+                [
+                    offsets_norm_to_pixel_v(
+                        tf.cast(tfio.experimental.image.decode_exr(content, 0, "G", tf.float16), tf.float32)
+                    ),
+                    offsets_norm_to_pixel_h(
+                        tf.cast(tfio.experimental.image.decode_exr(content, 0, "R", tf.float16), tf.float32)
+                    )
+                ],
                 axis=2
             )
             for content in lr_motion_contents
