@@ -82,8 +82,8 @@ class RGBDMotionDataset:
             )
             for content in lr_depth_contents
         ]
-        offsets_norm_to_pixel_h = lambda t: t * tf.shape(t)[-1]
-        offsets_norm_to_pixel_v = lambda t: -1 * t * tf.shape(t)[-2]
+        offsets_norm_to_pixel_h = lambda t: t * tf.cast(tf.shape(t), dtype=tf.float32)[-1]
+        offsets_norm_to_pixel_v = lambda t: -1.0 * t * tf.cast(tf.shape(t), dtype=tf.float32)[-2]
         lr_motion_tensors = [
             tf.stack(
                 # motion vectors are read in YX format
