@@ -8,27 +8,48 @@ from tensorflow.keras.layers import UpSampling2D, InputLayer
 from model.dataset import RGBDMotionDataset
 from model.metrics import psnr, ssim
 
-UPSAMPLING_FACTOR = 4
 
-
-def bilinear_baseline(input_shape):
+def bilinear_baseline(input_shape, upsampling_factor):
     model = Sequential()
     model.add(InputLayer(input_shape=input_shape))
-    model.add(UpSampling2D(size=(UPSAMPLING_FACTOR, UPSAMPLING_FACTOR), interpolation="bilinear"))
+    model.add(UpSampling2D(size=(upsampling_factor, upsampling_factor), interpolation="bilinear"))
     return model
 
 
-def main(args):
+def log_stdout(train_results, val_results, model_name):
+    train_results_str = ", ".join([f"{key}: {value}" for key, value in train_results.items()])
+    val_results_str = ", ".join([f"{key}: {value}" for key, value in val_results.items()])
+    print(f"===> Model {model_name} (train): {train_results_str}")
+    print(f"===> Model {model_name} (val):   {val_results_str}")
+
+
+def log_clearml(train_results, val_results, model_name):
+    import clearml
+    keys = list(train_results.keys())
+    headers = ["dataset"] + keys
+    rows = [
+        headers,
+        ["train"] + [float(train_results[key]) for key in keys],
+        ["val"] + [float(val_results[key]) for key in keys]
+    ]
+    clearml.Logger.current_logger().report_table(
+        "Baselines",
+        model_name,
+        table_plot=rows
+    )
+
+
+def create_datasets(args):
     seq_overlap_mode = args.data_seq_overlap_mode
     if seq_overlap_mode.isnumeric():
         seq_overlap_mode = int(seq_overlap_mode)
     target_size = (
-        args.patch_size[0] * UPSAMPLING_FACTOR, 
-        args.patch_size[1] * UPSAMPLING_FACTOR
+        args.patch_size[0] * args.scale_factor, 
+        args.patch_size[1] * args.scale_factor
     )
     target_step = (
-        args.patch_step[0] * UPSAMPLING_FACTOR,
-        args.patch_step[1] * UPSAMPLING_FACTOR
+        args.patch_step[0] * args.scale_factor,
+        args.patch_step[1] * args.scale_factor
     )
     dataset_factory = RGBDMotionDataset(
         args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir,
@@ -40,21 +61,30 @@ def main(args):
         seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, use_keras_input_mapping=True
     )
     train_dataset = train_dataset.map(lambda d, t: (d["color"][-1, :, :, :], t))
-    train_dataset = train_dataset.batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
+    train_dataset = train_dataset.batch(args.batch)
+    train_dataset = train_dataset.shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
     val_dataset = dataset_factory.tf_dataset(
         seq_frame_overlap_mode=seq_overlap_mode, split_fraction=train_fraction, take_top=True, use_keras_input_mapping=True
     )
     val_dataset = val_dataset.map(lambda d, t: (d["color"][-1, :, :, :], t))
-    val_dataset = val_dataset.batch(args.batch).shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
+    val_dataset = val_dataset.batch(args.batch)
+    val_dataset = val_dataset.shuffle(buffer_size=args.buffer_shuffle).prefetch(buffer_size=args.buffer_prefetch)
 
-    model = bilinear_baseline((args.patch_size[0], args.patch_size[1], 3))
+    return train_dataset, val_dataset
+
+
+def main(args):
+    train_dataset, val_dataset = create_datasets(args)
+
+    model = bilinear_baseline((args.patch_size[0], args.patch_size[1], 3), args.scale_factor)
     model.compile(metrics=[psnr, ssim])
+    
     train_results = model.evaluate(train_dataset, return_dict=True)
     val_results = model.evaluate(val_dataset, return_dict=True)
-    train_results_str = ", ".join([f"{key}: {value}" for key, value in train_results.items()])
-    val_results_str = ", ".join([f"{key}: {value}" for key, value in val_results.items()])
-    print(f"====> Bilinear upsampling model (train): {train_results_str}")
-    print(f"====> Bilinear upsampling model (train): {val_results_str}")
+
+    log_stdout(train_results, val_results, "bilinear-upsampling")
+    if args.clearml:
+        log_clearml(train_results, val_results, "bilinear-upsampling")
 
 
 def parse_args():
@@ -62,6 +92,7 @@ def parse_args():
     parser.add_argument("--batch", default=2, type=int, help="Batch size")
     parser.add_argument("--patch-size", default=[120, 120], action="store", type=int, nargs=2, help="Image patch size")
     parser.add_argument("--patch-step", default=[60, 60], action="store", type=int, nargs=2, help="Image patch step")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
@@ -69,6 +100,7 @@ def parse_args():
     parser.add_argument("--data-seq-overlap-mode", default="all", help="Dataset frame sequence overlap strategory (all, none, [0-9])")
     parser.add_argument("--buffer-shuffle", default=128, type=int, help="Dataset shuffle buffer size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
+    parser.add_argument("--clearml", action="store_true", help="Use clearml storage/debug samples mechanism")
 
     args = parser.parse_args()
     return args

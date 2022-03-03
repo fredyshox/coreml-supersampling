@@ -140,6 +140,13 @@ cython_debug/
 # project specific
 .vscode
 *.swp
+*.o
+*.dylib
 logs/
 checkpoints/
+temporary/
 Playground.ipynb
+ANETestMLModel
+ane_xpc
+ane_bench
+ane_test

@@ -1,4 +1,6 @@
 tensorflow==2.3.4
 tensorflow-io==0.16.0
 tensorflow-addons==0.13.0
+coremltools==5.1.0
 tqdm
+clearml

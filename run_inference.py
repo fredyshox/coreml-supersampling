@@ -12,8 +12,8 @@ from tqdm import tqdm
 
 from model.model import SuperSamplingModel
 from model.dataset import RGBDMotionDataset
+from model.loader import resolve_weights_uri
 
-UPSAMPLING_FACTOR = 4
 DEBUG_SAMPLE_COUNT = 8
 
 
@@ -22,7 +22,8 @@ def main(args):
         tf.config.set_visible_devices([], "GPU")
     
     dataset_factory = RGBDMotionDataset(
-        args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir
+        args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir, 
+        frames_per_sample=args.frame_count
     )
     split_fraction, take_top = parse_data_fraction(args.data_fraction)
     dataset = dataset_factory.tf_dataset(
@@ -34,17 +35,21 @@ def main(args):
     ).batch(args.batch).take(args.data_limit).prefetch(args.buffer_prefetch)
 
     model = SuperSamplingModel(
+        upsampling_factor=args.scale_factor,
         layer_config=args.rec_layer_config,
         upsize_type=args.rec_upsize_type, 
-        warp_type=args.warp_type
+        warp_type=args.warp_type,
+        feature_extraction_enabled=not args.no_feature_extraction,
+        frame_count=args.frame_count
     )
-    load_weights(model, args.weights_path, dataset)
+    weights_file_path = resolve_weights_uri(args.weights_path)
+    load_weights(model, weights_file_path, dataset)
     predictions = model.predict(dataset, verbose=1)
 
     images_path = os.path.join(args.output_dir, "reconstructions")
     os.makedirs(images_path, exist_ok=True)
     for i, image in tqdm(enumerate(predictions), desc="Saving predictions"):
-        image_path = os.path.join(images_path, f"{i}_{UPSAMPLING_FACTOR}x.png")
+        image_path = os.path.join(images_path, f"{i}_{args.scale_factor}x.png")
         u8_image = tf.image.convert_image_dtype(image, tf.uint8)
         image_data = tf.io.encode_png(u8_image)
         tf.io.write_file(image_path, image_data)
@@ -64,10 +69,9 @@ def main(args):
 def parse_data_fraction(fraction):
     if fraction is not None:
         frac_num = float(fraction)
-        if abs(frac_num) > 1.0:
-            raise ValueError("data-fraction must be in range -1...1")
-        take_top = frac_num < 0
-        return abs(frac_num), take_top
+        if frac_num < 0 or frac_num > 1.0:
+            raise ValueError("data-fraction must be in range 0...1")
+        return frac_num, True
     else:
         return None, False
 
@@ -88,15 +92,18 @@ def parse_args():
     parser.add_argument("--data-root-dir", required=True, help="Dataset root dir")
     parser.add_argument("--data-lr-subdir", required=True, help="Dataset low-res subdir")
     parser.add_argument("--data-hr-subdir", required=True, help="Dataset high-res subdir")
-    parser.add_argument("--data-fraction", default=None, type=float, help="Dataset fraction (can be negative)") # FIXME imo desc is not good 
+    parser.add_argument("--data-fraction", default=None, type=float, help="Dataset lower bound in fraction (0...1)") 
     parser.add_argument("--data-limit", default=None, type=int, help="Dataset sample limit")
-    parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load (resume training)")
+    parser.add_argument("--weights-path", required=True, type=str, help="Path to file with weights to load. Can be local file path or clearml task output: `clearml://<task-id>/[<model-index>]`")
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--batch", default=1, type=int, help="Batch size")
     parser.add_argument("--buffer-prefetch", default=64, type=int, help="Dataset prefetch buffer size")
+    parser.add_argument("--scale-factor", default=4, type=int, help="Super sampling target scale factor (should match dataset paths)")
+    parser.add_argument("--frame-count", default=5, type=int, help="Observed frame sequence length")
     parser.add_argument("--rec-upsize-type", default="upsample", choices=["upsample", "deconv"], help="Reconstruction block upsampling type")
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
+    parser.add_argument("--no-feature-extraction", default=False, help="Disable feature extraction")
     parser.add_argument("--cpu", action="store_true", help="Use CPU even if GPU is available")
     parser.add_argument("--clearml", action="store_true", help="Use clearml storage/debug samples mechanism")
 
