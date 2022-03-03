@@ -88,6 +88,7 @@ class RGBDMotionDataset:
             tf.stack(
                 # motion vectors are read in YX format
                 # these are also in noormalized coordinates: https://forum.unity.com/threads/what-are-motion-vectors.1024924/
+                # and are relative to origin (0, 0) at bottom-left corner (instead of top-left)
                 [
                     offsets_norm_to_pixel_v(
                         tf.cast(tfio.experimental.image.decode_exr(content, 0, "G", tf.float16), tf.float32)
