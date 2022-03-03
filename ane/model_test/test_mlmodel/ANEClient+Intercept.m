@@ -2,6 +2,8 @@
 #import <IOSurface/IOSurface.h>
 #import <objc/runtime.h>
 
+#import "IOSurface+Description.h"
+
 static char InterceptorKey;
 
 @interface _ANEInterceptor: NSObject 
@@ -46,6 +48,8 @@ static char InterceptorKey;
         size_t size = IOSurfaceGetAllocSize(surface);
         NSData* data = [NSData dataWithBytes:bytes length: size];
         [data writeToURL:inputLogFileURL atomically:NO];
+
+        NSLog(@"Input surface: %@", IOSurfaceDescription(surface));
     }
 
     NSData* keyData = [[model key] dataUsingEncoding: NSUTF8StringEncoding];
@@ -70,6 +74,8 @@ static char InterceptorKey;
         size_t size = IOSurfaceGetAllocSize(surface);
         NSData* data = [NSData dataWithBytes:bytes length: size];
         [data writeToURL:outputLogFileURL atomically:NO];
+
+        NSLog(@"Output surface: %@", IOSurfaceDescription(surface));
     }
 
     return result;

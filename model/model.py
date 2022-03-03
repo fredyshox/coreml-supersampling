@@ -69,7 +69,8 @@ class SuperSamplingModel(tf.keras.Model):
         backward_warped_features = self.backward_warping(upsampled_previous_features, upsampled_motion_vectors)
 
         upsampled_current_features = upsampled_features[:, previous_frame_count, :, :, :]
-        reconstructed_frame = self.reconstruction(upsampled_current_features, backward_warped_features)
+        reconstruction_input = self.reconstruction.x_tensor_from_frames(upsampled_current_features, backward_warped_features)
+        reconstructed_frame = self.reconstruction(reconstruction_input)
 
         return reconstructed_frame
     
