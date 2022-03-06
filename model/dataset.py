@@ -126,7 +126,7 @@ class RGBDMotionDataset:
                 tf.expand_dims(tf.stack(lr_motion_tensors), axis=0)
             ]
             y = hr_color_tensor
-            f = lr_color_paths
+            f = tf.convert_to_tensor([lr_color_paths])
 
         if include_paths:
             return (*x, y, f)

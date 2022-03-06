@@ -32,7 +32,7 @@ def main(args):
         for i, (image, filepath) in enumerate(zip(previous[0], fp[0][:-1])):
             u8_image = tf.image.convert_image_dtype(image, tf.uint8)
             image_data = tf.io.encode_png(u8_image)
-            filename_noext, _ = os.path.splitext(os.path.basename(filepath))
+            filename_noext, _ = os.path.splitext(os.path.basename(filepath.numpy().decode()))
             output_filepath = os.path.join(args.output_dir, f"{filename_noext}+{args.frame_count-1-i}.png")
             tf.io.write_file(output_filepath, image_data)
 

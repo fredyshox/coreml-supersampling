@@ -9,6 +9,8 @@ from model.components.extraction import FeatureExtractionModule
 
 class PreprocessingModel(tf.keras.Model):
     def __init__(self, upsampling_factor, warp_type, frame_count, feature_extraction_model=None):
+        super().__init__()
+        
         assert warp_type in ["single", "acc", "accfast"], "Invalid warp_type. Supported values: single, acc, accfast"
 
         self.frame_count = frame_count
