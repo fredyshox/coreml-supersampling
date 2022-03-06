@@ -87,8 +87,14 @@ class RGBDMotionDataset:
             )
             for content in lr_depth_contents
         ]
-        offsets_norm_to_pixel_h = lambda t: t * tf.cast(tf.shape(t), dtype=tf.float32)[-1]
-        offsets_norm_to_pixel_v = lambda t: -1.0 * t * tf.cast(tf.shape(t), dtype=tf.float32)[-2]
+        hr_color_tensor = tf.expand_dims(
+            tf.image.convert_image_dtype(tf.io.decode_png(hr_color_content, channels=3), tf.float32),
+            axis=0
+        )
+        # scale motion to hr 
+        hr_shape = tf.cast(tf.shape(hr_color_tensor), dtype=tf.float32)
+        offsets_norm_to_pixel_h = lambda t: t * hr_shape[-2]
+        offsets_norm_to_pixel_v = lambda t: -1.0 * t * hr_shape[-3]
         lr_motion_tensors = [
             tf.stack(
                 # motion vectors are read in YX format
@@ -106,10 +112,6 @@ class RGBDMotionDataset:
             )
             for content in lr_motion_contents
         ]
-        hr_color_tensor = tf.expand_dims(
-            tf.image.convert_image_dtype(tf.io.decode_png(hr_color_content, channels=3), tf.float32),
-            axis=0
-        )
 
         if enable_patches:
             x = [
