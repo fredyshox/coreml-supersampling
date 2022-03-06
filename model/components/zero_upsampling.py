@@ -20,6 +20,6 @@ class ZeroUpsampling(tf.Module):
         )
 
         grid_x, grid_y = tf.meshgrid(tf.range(width), tf.range(height))
-        doubled_grid_yx = tf.stack([grid_y, grid_x], axis=2)*2
+        doubled_grid_yx = tf.stack([grid_y, grid_x], axis=2)*self.scale_factor
         output_shape = tf.constant([height*self.scale_factor, width*self.scale_factor, channels])
         return tf.map_fn(lambda i: tf.scatter_nd(doubled_grid_yx, i, output_shape), elems=x)
