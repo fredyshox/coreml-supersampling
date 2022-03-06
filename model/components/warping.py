@@ -49,14 +49,15 @@ class AccumulativeBackwardWarp(tf.Module):
         tf.assert_equal(tf.rank(images), 5)
         tf.assert_equal(tf.shape(images)[:-1], tf.shape(flows)[:-1])
 
-        # not tested, may not work...
-        _, seq_len, _, _, _ = tf.shape(flows)
-        warped_images = [images[:, img_index, :, :, :] for img_index in range(seq_len)]
-        for img_index in range(seq_len):
-            for flow_index in range(img_index + 1):
-                warped_images[img_index] = self.backward_warp(warped_images[img_index], flows[:, flow_index, :, :, :])
+        seq_len = tf.shape(flows)[1]
 
+        warped_images = tf.unstack(images, axis=1)
+        for img_index, image in enumerate(warped_images):
+            for flow_index in tf.range(img_index, seq_len):
+                image = self.backward_warp(image, flows[:, flow_index, :, :, :])
+            warped_images[img_index] = image
         warped_image = tf.stack(warped_images, axis=1)
+        
         return warped_image
 
 
