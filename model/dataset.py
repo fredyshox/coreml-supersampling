@@ -9,6 +9,9 @@ COLOR_ID = "COLOR"
 DEPTH_ID = "DEPTH"
 MOTION_ID = "MOTIONVECTORS"
 
+def ELEM_IF(condition, element):
+    return [element] if condition else []
+
 class RGBDMotionDataset:
     def __init__(
         self, root_dir, lr_subdir, hr_subdir, 
@@ -51,7 +54,9 @@ class RGBDMotionDataset:
             tuple(tf.shape(hr_image)[:-1].numpy())
         )
 
-    def _image_seq_map_func(self, rec_subdir, indices, enable_patches):
+    def _image_seq_map_func(self, rec_subdir, indices, enable_patches, include_paths):
+        assert not(enable_patches and include_paths), "enable_patches and include_filenames are exclusive"
+
         rec_name = os.path.basename(rec_subdir)
         lr_color_paths = [
             os.path.join(self.root_dir, rec_subdir, self.lr_subdir, f"{rec_name}.{self.lr_subdir}.{COLOR_ID}.{i}.png") 
@@ -112,7 +117,8 @@ class RGBDMotionDataset:
                 self._create_image_patches(tf.stack(lr_depth_tensors)), 
                 self._create_image_patches(tf.stack(lr_motion_tensors))
             ]
-            y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode='target'), axis=[1])
+            y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode="target"), axis=[1])
+            f = None # NOTE patches do not support filename output
         else:
             x = [
                 tf.expand_dims(tf.stack(lr_color_tensors), axis=0),
@@ -120,8 +126,12 @@ class RGBDMotionDataset:
                 tf.expand_dims(tf.stack(lr_motion_tensors), axis=0)
             ]
             y = hr_color_tensor
+            f = lr_color_paths
 
-        return (*x, y)
+        if include_paths:
+            return (*x, y, f)
+        else:
+            return (*x, y)
 
     def _create_image_patches(self, tensors, mode="input"):
         if mode == "input":
@@ -133,7 +143,7 @@ class RGBDMotionDataset:
         else:
             raise ValueError(f"Invalid mode: {mode}")
         
-        patches = tf.image.extract_patches(tensors, kernel, strides, (1,1,1,1), 'VALID')
+        patches = tf.image.extract_patches(tensors, kernel, strides, (1,1,1,1), "VALID")
         new_shape = (tensors.shape[0], -1, kernel[1], kernel[2], tensors.shape[3])
         patches = tf.reshape(patches, new_shape)
         patches = tf.transpose(patches, [1, 0, 2, 3, 4])
@@ -153,11 +163,12 @@ class RGBDMotionDataset:
 
         return indices
 
-    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False, create_patches=True):
+    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False, create_patches=True, include_paths=False):
         if isinstance(seq_frame_overlap_mode, str):
             assert seq_frame_overlap_mode in ["all", "none"], "seq_frame_overlap_mode possible string values overlap_all, overlap_none"
         elif isinstance(seq_frame_overlap_mode, int):
             assert seq_frame_overlap_mode in range(1, self.frames_per_sample + 1), "seq_frame_overlap_mode integer value must be in range 1...frames_per_sample"
+        assert not(create_patches and include_paths), "create_patches and include_filenames are exclusive"
 
         rec_paths = glob(os.path.join(self.root_dir, "*"))
         rec_paths = [path for path in rec_paths if os.path.isdir(path)]
@@ -173,7 +184,7 @@ class RGBDMotionDataset:
         def image_generator():
             for path in rec_paths:
                 for ids in self._frame_indices(seq_frame_overlap_mode):
-                    samples = self._image_seq_map_func(path, ids, create_patches)
+                    samples = self._image_seq_map_func(path, ids, create_patches, include_paths)
                     yield samples
 
         if not create_patches:
@@ -198,29 +209,35 @@ class RGBDMotionDataset:
                     ),
                     tf.TensorSpec(
                         shape=(None, target_patch_size[0], target_patch_size[1], 3), dtype=tf.float32
-                    )
+                    ),
+                    *ELEM_IF(include_paths, tf.TensorSpec(shape=(None, self.frames_per_sample), dtype=tf.string))
                 )
             )
         else:
             dataset = tf.data.Dataset.from_generator(
                 image_generator,
-                output_types=(tf.float32, tf.float32, tf.float32, tf.float32),
+                output_types=(tf.float32, tf.float32, tf.float32, tf.float32, *ELEM_IF(include_paths, tf.string)),
                 output_shapes=(
                     (None, self.frames_per_sample, input_patch_size[0], input_patch_size[1], 3),
                     (None, self.frames_per_sample, input_patch_size[0], input_patch_size[1], 1),
                     (None, self.frames_per_sample - 1, input_patch_size[0], input_patch_size[1], 2),
-                    (None, target_patch_size[0], target_patch_size[1], 3)
+                    (None, target_patch_size[0], target_patch_size[1], 3),
+                    *ELEM_IF(include_paths, (None, self.frames_per_sample))
                 )
             )
 
-        dataset = dataset.flat_map(lambda rgb, d, mv, y: tf.data.Dataset.zip((
-            tf.data.Dataset.from_tensor_slices(rgb),
-            tf.data.Dataset.from_tensor_slices(d),
-            tf.data.Dataset.from_tensor_slices(mv),
-            tf.data.Dataset.from_tensor_slices(y)
-        )))
+        dataset = dataset.flat_map(lambda *args: tf.data.Dataset.zip(tuple([
+            tf.data.Dataset.from_tensor_slices(arg)
+            for arg in args
+        ])))
         if use_keras_input_mapping:
             # keras fit will accept input in format [inputs, targets]
-            dataset = dataset.map(lambda rgb, d, mv, y: ({"color": rgb, "depth": d, "motion": mv}, y))
+            if include_paths:
+                def keras_input_map(rgb, d, mv, y, fn):
+                    return ({"color": rgb, "depth": d, "motion": mv, "filename": fn}, y)
+            else:
+                def keras_input_map(rgb, d, mv, y):
+                    return ({"color": rgb, "depth": d, "motion": mv}, y)
+            dataset = dataset.map(keras_input_map)
 
         return dataset
