@@ -59,10 +59,11 @@ class PreprocessingModel(tf.keras.Model):
 
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, feature_extraction_enabled=True, frame_count=5):
+    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, feature_extraction_enabled=True, prebuild_preprocessing=False, frame_count=5):
         super().__init__()
 
         feature_extraction = FeatureExtractionModule() if feature_extraction_enabled else None
+        self.prebuild_preprocessing = prebuild_preprocessing
         self.preprocessing = PreprocessingModel(upsampling_factor, warp_type, frame_count, feature_extraction)
         self.reconstruction = ReconstructionModule4X(
             frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type,
@@ -78,12 +79,19 @@ class SuperSamplingModel(tf.keras.Model):
 
     def call(self, inputs, training=None, mask=None):
         # everything in format [batch, seq, height, width, channels]
-        rgb_frames = inputs["color"] # seq = frame_count
-        depth_frames = inputs["depth"] # seq = frame_count
-        motion_frames = inputs["motion"] # seq = frame_count - 1
+        if not self.prebuild_preprocessing:
+            rgb_frames = inputs["color"] # seq = frame_count
+            depth_frames = inputs["depth"] # seq = frame_count
+            motion_frames = inputs["motion"] # seq = frame_count - 1
 
-        rgbd_frames = tf.concat((rgb_frames, depth_frames), axis=4)
-        upsampled_current_features, backward_warped_features = self.preprocessing(rgbd_frames, motion_frames)
+            rgbd_frames = tf.concat((rgb_frames, depth_frames), axis=4)
+            upsampled_current_features, backward_warped_features = self.preprocessing(rgbd_frames, motion_frames)
+        else:
+            rgb_frames = inputs["color"] # seq = frame_count
+            depth_frames = inputs["depth"] # seq = frame_count
+
+            upsampled_current_features = tf.concat((rgb_frames[:, -1], depth_frames[:, -1]), axis=3)
+            backward_warped_features = tf.concat((rgb_frames[:, :-1], depth_frames[:, :-1]), axis=4)
 
         reconstruction_input = self.reconstruction.x_tensor_from_frames(upsampled_current_features, backward_warped_features)
         reconstructed_frame = self.reconstruction(reconstruction_input)

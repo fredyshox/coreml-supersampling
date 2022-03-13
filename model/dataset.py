@@ -165,37 +165,7 @@ class RGBDMotionDataset:
 
         return indices
 
-    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False, create_patches=True, include_paths=False):
-        if isinstance(seq_frame_overlap_mode, str):
-            assert seq_frame_overlap_mode in ["all", "none"], "seq_frame_overlap_mode possible string values overlap_all, overlap_none"
-        elif isinstance(seq_frame_overlap_mode, int):
-            assert seq_frame_overlap_mode in range(1, self.frames_per_sample + 1), "seq_frame_overlap_mode integer value must be in range 1...frames_per_sample"
-        assert not(create_patches and include_paths), "create_patches and include_filenames are exclusive"
-
-        rec_paths = glob(os.path.join(self.root_dir, "*"))
-        rec_paths = [path for path in rec_paths if os.path.isdir(path)]
-        if split_fraction is not None:
-            if not take_top:
-                rec_paths = rec_paths[:int(split_fraction * len(rec_paths))]
-            else:
-                rec_paths = rec_paths[int(split_fraction * len(rec_paths)):]
-
-        if len(rec_paths) == 0:
-            raise ValueError(f"Found 0 recordings in {self.root_dir}!")
-
-        def image_generator():
-            for path in rec_paths:
-                for ids in self._frame_indices(seq_frame_overlap_mode):
-                    samples = self._image_seq_map_func(path, ids, create_patches, include_paths)
-                    yield samples
-
-        if not create_patches:
-            input_patch_size, target_patch_size = self._discover_image_sizes()
-        elif self.image_patch_size is not None or self.target_patch_size is not None:
-            input_patch_size, target_patch_size = self.image_patch_size, self.target_patch_size
-        else:
-            raise ValueError("image_patch_size, target_patch_size must not be None when create_patches is False")
-        
+    def _dataset_from_generator(self, image_generator, input_patch_size, target_patch_size, include_paths):
         if tf_minor_version_geq(5):
             dataset = tf.data.Dataset.from_generator(
                 image_generator,
@@ -227,19 +197,162 @@ class RGBDMotionDataset:
                     *ELEM_IF(include_paths, (None, self.frames_per_sample))
                 )
             )
+        
+        return dataset
 
+    def _keras_input_map_func(self, include_paths):
+        # keras fit will accept input in format [inputs, targets]
+        if include_paths:
+            def keras_input_map(rgb, d, mv, y, fn):
+                return ({"color": rgb, "depth": d, "motion": mv, "filename": fn}, y)
+        else:
+            def keras_input_map(rgb, d, mv, y):
+                return ({"color": rgb, "depth": d, "motion": mv}, y)
+        
+        return keras_input_map
+
+    def tf_dataset(self, seq_frame_overlap_mode="all", split_fraction=None, take_top=False, use_keras_input_mapping=False, create_patches=True, include_paths=False):
+        if isinstance(seq_frame_overlap_mode, str):
+            assert seq_frame_overlap_mode in ["all", "none"], "seq_frame_overlap_mode possible string values overlap_all, overlap_none"
+        elif isinstance(seq_frame_overlap_mode, int):
+            assert seq_frame_overlap_mode in range(1, self.frames_per_sample + 1), "seq_frame_overlap_mode integer value must be in range 1...frames_per_sample"
+        assert not(create_patches and include_paths), "create_patches and include_filenames are exclusive"
+
+        rec_paths = glob(os.path.join(self.root_dir, "*"))
+        rec_paths = [path for path in rec_paths if os.path.isdir(path)]
+        if split_fraction is not None:
+            if not take_top:
+                rec_paths = rec_paths[:int(split_fraction * len(rec_paths))]
+            else:
+                rec_paths = rec_paths[int(split_fraction * len(rec_paths)):]
+
+        if len(rec_paths) == 0:
+            raise ValueError(f"Found 0 recordings in {self.root_dir}!")
+
+        def image_generator():
+            for path in rec_paths:
+                for ids in self._frame_indices(seq_frame_overlap_mode):
+                    samples = self._image_seq_map_func(path, ids, create_patches, include_paths)
+                    yield samples
+
+        if not create_patches:
+            input_patch_size, target_patch_size = self._discover_image_sizes()
+        elif self.image_patch_size is not None or self.target_patch_size is not None:
+            input_patch_size, target_patch_size = self.image_patch_size, self.target_patch_size
+        else:
+            raise ValueError("image_patch_size, target_patch_size must not be None when create_patches is False")
+        
+        dataset = self._dataset_from_generator(image_generator, input_patch_size, target_patch_size, include_paths)
         dataset = dataset.flat_map(lambda *args: tf.data.Dataset.zip(tuple([
             tf.data.Dataset.from_tensor_slices(arg)
             for arg in args
         ])))
-        if use_keras_input_mapping:
-            # keras fit will accept input in format [inputs, targets]
-            if include_paths:
-                def keras_input_map(rgb, d, mv, y, fn):
-                    return ({"color": rgb, "depth": d, "motion": mv, "filename": fn}, y)
-            else:
-                def keras_input_map(rgb, d, mv, y):
-                    return ({"color": rgb, "depth": d, "motion": mv}, y)
-            dataset = dataset.map(keras_input_map)
 
+        if use_keras_input_mapping:
+            dataset = dataset.map(self._keras_input_map_func(include_paths))
+
+        return dataset
+
+
+class PrebuildPreprocRGBDDataset(RGBDMotionDataset):
+    def __init__(
+        self, root_dir, lr_subdir, hr_subdir, scale_factor, **kwargs
+    ):
+        super().__init__(
+            root_dir, lr_subdir, hr_subdir
+            **kwargs
+        )
+        self.scale_factor = scale_factor
+
+    def _image_seq_map_func(self, rec_subdir, indices, enable_patches, include_paths):
+        assert not include_paths, "include_paths currently not supported for prebuilds"
+
+        prebuild_subdir = f"{self.scale_factor}x"
+        rec_name = os.path.basename(rec_subdir)
+        lr_color_paths = [
+            os.path.join(self.root_dir, rec_subdir, self.lr_subdir, prebuild_subdir, f"{rec_name}.{self.lr_subdir}.{COLOR_ID}.{index}+{len(indices)-i-1}.exr") 
+            for i, index in enumerate(indices)
+        ]
+        lr_depth_paths = [
+             os.path.join(self.root_dir, rec_subdir, self.lr_subdir, prebuild_subdir, f"{rec_name}.{self.lr_subdir}.{DEPTH_ID}.{index}+{len(indices)-i-1}.exr") 
+            for i, index in enumerate(indices)
+        ]
+        hr_color_path = os.path.join(self.root_dir, rec_subdir, self.hr_subdir, f"{rec_name}.{self.hr_subdir}.{COLOR_ID}.{indices[-1]}.png") 
+
+        lr_color_contents = [tf.io.read_file(path) for path in lr_color_paths]
+        lr_depth_contents = [tf.io.read_file(path) for path in lr_depth_paths]
+        hr_color_content = tf.io.read_file(hr_color_path)
+
+        lr_color_tensors = [
+            tf.stack(
+                [
+                    tf.cast(tfio.experimental.image.decode_exr(content, 0, "R", tf.float16), tf.float32),
+                    tf.cast(tfio.experimental.image.decode_exr(content, 0, "G", tf.float16), tf.float32),
+                    tf.cast(tfio.experimental.image.decode_exr(content, 0, "B", tf.float16), tf.float32)
+                ],
+                axis=2
+            )
+            for content in lr_color_contents 
+        ]
+        lr_depth_tensors = [
+            tf.expand_dims(
+                tf.cast(tfio.experimental.image.decode_exr(content, 0, "R", tf.float16), tf.float32),
+                axis=2
+            )
+            for content in lr_depth_contents
+        ]
+        hr_color_tensor = tf.expand_dims(
+            tf.image.convert_image_dtype(tf.io.decode_png(hr_color_content, channels=3), tf.float32),
+            axis=0
+        )
+
+        if enable_patches:
+            x = [
+                self._create_image_patches(tf.stack(lr_color_tensors), mode="target"),
+                self._create_image_patches(tf.stack(lr_depth_tensors), mode="target") 
+            ]
+            y = tf.squeeze(self._create_image_patches(hr_color_tensor, mode="target"), axis=[1])
+        else:
+            x = [
+                tf.expand_dims(tf.stack(lr_color_tensors), axis=0),
+                tf.expand_dims(tf.stack(lr_depth_tensors), axis=0)
+            ]
+            y = hr_color_tensor
+
+        return (*x, y)
+
+    def _keras_input_map_func(self, include_paths):
+        # keras fit will accept input in format [inputs, targets]
+        def keras_input_map(rgb, d, y):
+            return ({"color": rgb, "depth": d}, y)
+        
+        return keras_input_map
+
+    def _dataset_from_generator(self, image_generator, input_patch_size, target_patch_size, include_paths):
+        if tf_minor_version_geq(5):
+            dataset = tf.data.Dataset.from_generator(
+                image_generator,
+                output_signature=(
+                    tf.TensorSpec(
+                        shape=(None, self.frames_per_sample, target_patch_size[0], target_patch_size[1], 3), dtype=tf.float32
+                    ),
+                    tf.TensorSpec(
+                        shape=(None, self.frames_per_sample, target_patch_size[0], target_patch_size[1], 1), dtype=tf.float32
+                    ),
+                    tf.TensorSpec(
+                        shape=(None, target_patch_size[0], target_patch_size[1], 3), dtype=tf.float32
+                    )
+                )
+            )
+        else:
+            dataset = tf.data.Dataset.from_generator(
+                image_generator,
+                output_types=(tf.float32, tf.float32, tf.float32, tf.float32, tf.float32),
+                output_shapes=(
+                    (None, self.frames_per_sample, target_patch_size[0], target_patch_size[1], 3),
+                    (None, self.frames_per_sample, target_patch_size[0], target_patch_size[1], 1),
+                    (None, target_patch_size[0], target_patch_size[1], 3)
+                )
+            )
+        
         return dataset
