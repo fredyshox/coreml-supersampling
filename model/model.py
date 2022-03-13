@@ -70,6 +70,10 @@ class SuperSamplingModel(tf.keras.Model):
             channels_per_frame=12 if feature_extraction_enabled else 4, output_channels=3
         )
 
+    @property
+    def expected_input_len(self):
+        return 3 if not self.prebuild_preprocessing else 2
+
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
         super(SuperSamplingModel, self).compile(*args, **kwargs)
         self.perceptual_loss = perceptual_loss
@@ -101,7 +105,7 @@ class SuperSamplingModel(tf.keras.Model):
     @tf.function
     def train_step(self, data):
         inputs, targets = data
-        assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
+        assert len(inputs) == self.expected_input_len, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
 
         with tf.GradientTape() as tape:
             reconstructions = self(inputs, training=True)
@@ -123,7 +127,7 @@ class SuperSamplingModel(tf.keras.Model):
     @tf.function
     def test_step(self, data):
         inputs, targets = data
-        assert len(inputs) == 3, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
+        assert len(inputs) == self.expected_input_len, "Inputs must consist of: rgb tensor, depth tensor, motion vec tensor"
 
         reconstructions = self(inputs, training=False)
         reconstructions_clipped = tf.clip_by_value(reconstructions, 0.0, 1.0)
