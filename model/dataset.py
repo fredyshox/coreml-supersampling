@@ -259,7 +259,7 @@ class PrebuildPreprocRGBDDataset(RGBDMotionDataset):
         self, root_dir, lr_subdir, hr_subdir, scale_factor, **kwargs
     ):
         super().__init__(
-            root_dir, lr_subdir, hr_subdir
+            root_dir, lr_subdir, hr_subdir,
             **kwargs
         )
         self.scale_factor = scale_factor
