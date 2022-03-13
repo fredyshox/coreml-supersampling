@@ -11,7 +11,7 @@ from tensorflow.python.keras.losses import MeanAbsoluteError, MeanSquaredError
 from model.model import SuperSamplingModel
 from model.loss import MixL2SSIMLoss, PerceptualLossMSE, SSIMLoss, MixL1SSIMLoss
 from model.metrics import psnr, ssim
-from model.dataset import RGBDMotionDataset, PrebuildPreprocRGBDDataset
+from model.dataset import RGBDMotionDataset, PrebuildPreprocDataset
 from model.vgg import PerceptualFPVGG16
 from model.callbacks import DebugSamplesCallback
 from model.loader import resolve_weights_uri
@@ -36,7 +36,7 @@ def create_datasets(args):
     )
 
     if args.prebuild_preproc:
-        dataset_factory = PrebuildPreprocRGBDDataset(
+        dataset_factory = PrebuildPreprocDataset(
             args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir, args.scale_factor,
             frames_per_sample=args.frame_count,
             image_patch_size=args.patch_size, image_patch_step=args.patch_step,
