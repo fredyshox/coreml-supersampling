@@ -116,8 +116,9 @@ class SuperSamplingDataset(ABC):
         def image_generator():
             for path in rec_paths:
                 for ids in self._frame_indices(seq_frame_overlap_mode):
-                    samples = self._image_seq_map_func(path, ids, create_patches, include_paths)
-                    yield samples
+                    with tf.device("/CPU:0"):
+                        samples = self._image_seq_map_func(path, ids, create_patches, include_paths)
+                        yield samples
 
         if not create_patches:
             input_patch_size, target_patch_size = self._discover_image_sizes()
