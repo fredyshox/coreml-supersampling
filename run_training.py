@@ -11,7 +11,7 @@ from tensorflow.python.keras.losses import MeanAbsoluteError, MeanSquaredError
 from model.model import SuperSamplingModel
 from model.loss import MixL2SSIMLoss, PerceptualLossMSE, SSIMLoss, MixL1SSIMLoss
 from model.metrics import psnr, ssim
-from model.dataset import RGBDMotionDataset, PrebuildPreprocDataset
+from model.dataset import RGBDMotionDataset, PrebuiltPreprocDataset
 from model.vgg import PerceptualFPVGG16
 from model.callbacks import DebugSamplesCallback
 from model.loader import resolve_weights_uri
@@ -35,8 +35,8 @@ def create_datasets(args):
         args.patch_step[1] * args.scale_factor
     )
 
-    if args.prebuild_preproc:
-        dataset_factory = PrebuildPreprocDataset(
+    if args.prebuilt_preproc:
+        dataset_factory = PrebuiltPreprocDataset(
             args.data_root_dir, args.data_lr_subdir, args.data_hr_subdir, args.scale_factor,
             frames_per_sample=args.frame_count,
             image_patch_size=args.patch_size, image_patch_step=args.patch_step,
@@ -125,7 +125,7 @@ def create_or_load_model(args, dataset, target_size):
         upsize_type=args.rec_upsize_type, 
         warp_type=args.warp_type,
         feature_extraction_enabled=not args.no_feature_extraction,
-        prebuild_preprocessing=args.prebuild_preproc,
+        prebuilt_preprocessing=args.prebuilt_preproc,
         frame_count=args.frame_count
     )
     optimizer = Adam(learning_rate=args.lr)
@@ -230,7 +230,7 @@ def parse_args():
     parser.add_argument("--rec-layer-config", default="standard", choices=["standard", "fast", "ultrafast"], help="Reconstruction layer config")
     parser.add_argument("--warp-type", default="single", choices=["single", "acc", "accfast"], help="Backward warping type")
     parser.add_argument("--no-feature-extraction", action="store_true", help="Disable feature extraction")
-    parser.add_argument("--prebuild-preproc", default="store_true", help="Use prebuild preprocessed frames from dataset, instead creating them on the fly")
+    parser.add_argument("--prebuilt-preproc", default="store_true", help="Use pre-built preprocessed frames from dataset, instead creating them on the fly")
     parser.add_argument("--vgg-layers", default=DEFAULT_VGG_LOSS_LAYERS, action="store", type=str, nargs="+", help="VGG layers to use in perceptual loss")
     parser.add_argument("--vgg-norm-loc", default=0.0, type=float, help="Mean value used for vgg activation standardization (use 0.0 to disable)")
     parser.add_argument("--vgg-norm-scale", default=1.0, type=float, help="Standard deviation used for vgg activation standardization (use 1.0 to disable)")

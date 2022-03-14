@@ -59,11 +59,11 @@ class PreprocessingModel(tf.keras.Model):
 
 
 class SuperSamplingModel(tf.keras.Model):
-    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, feature_extraction_enabled=True, prebuild_preprocessing=False, frame_count=5):
+    def __init__(self, upsampling_factor, layer_config, upsize_type, warp_type, feature_extraction_enabled=True, prebuilt_preprocessing=False, frame_count=5):
         super().__init__()
 
         feature_extraction = FeatureExtractionModule() if feature_extraction_enabled else None
-        self.prebuild_preprocessing = prebuild_preprocessing
+        self.prebuilt_preprocessing = prebuilt_preprocessing
         self.preprocessing = PreprocessingModel(upsampling_factor, warp_type, frame_count, feature_extraction)
         self.reconstruction = ReconstructionModule4X(
             frame_count=frame_count, layer_config=layer_config, upsize_type=upsize_type,
@@ -72,7 +72,7 @@ class SuperSamplingModel(tf.keras.Model):
 
     @property
     def expected_input_len(self):
-        return 3 if not self.prebuild_preprocessing else 2
+        return 3 if not self.prebuilt_preprocessing else 2
 
     def compile(self, perceptual_loss, perceptual_loss_model, perceptual_loss_weight, *args, **kwargs):
         super(SuperSamplingModel, self).compile(*args, **kwargs)
@@ -83,7 +83,7 @@ class SuperSamplingModel(tf.keras.Model):
 
     def call(self, inputs, training=None, mask=None):
         # everything in format [batch, seq, height, width, channels]
-        if not self.prebuild_preprocessing:
+        if not self.prebuilt_preprocessing:
             rgb_frames = inputs["color"] # seq = frame_count
             depth_frames = inputs["depth"] # seq = frame_count
             motion_frames = inputs["motion"] # seq = frame_count - 1

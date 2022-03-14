@@ -267,7 +267,7 @@ class RGBDMotionDataset(SuperSamplingDataset):
         return keras_input_map
 
 
-class PrebuildPreprocDataset(SuperSamplingDataset):
+class PrebuiltPreprocDataset(SuperSamplingDataset):
     def __init__(
         self, root_dir, lr_subdir, hr_subdir, scale_factor, **kwargs
     ):
@@ -278,16 +278,16 @@ class PrebuildPreprocDataset(SuperSamplingDataset):
         self.scale_factor = scale_factor
 
     def _image_seq_map_func(self, rec_subdir, indices, enable_patches, include_paths):
-        assert not include_paths, "include_paths currently not supported for prebuilds"
+        assert not include_paths, "include_paths currently not supported for prebuiltss"
 
-        prebuild_subdir = f"{self.scale_factor}x"
+        prebuilt_subdir = f"{self.scale_factor}x"
         rec_name = os.path.basename(rec_subdir)
         lr_color_paths = [
-            os.path.join(self.root_dir, rec_subdir, self.lr_subdir, prebuild_subdir, f"{rec_name}.{self.lr_subdir}.{COLOR_ID}.{index}+{len(indices)-i-1}.exr") 
+            os.path.join(self.root_dir, rec_subdir, self.lr_subdir, prebuilt_subdir, f"{rec_name}.{self.lr_subdir}.{COLOR_ID}.{index}+{len(indices)-i-1}.exr") 
             for i, index in enumerate(indices)
         ]
         lr_depth_paths = [
-             os.path.join(self.root_dir, rec_subdir, self.lr_subdir, prebuild_subdir, f"{rec_name}.{self.lr_subdir}.{DEPTH_ID}.{index}+{len(indices)-i-1}.exr") 
+             os.path.join(self.root_dir, rec_subdir, self.lr_subdir, prebuilt_subdir, f"{rec_name}.{self.lr_subdir}.{DEPTH_ID}.{index}+{len(indices)-i-1}.exr") 
             for i, index in enumerate(indices)
         ]
         hr_color_path = os.path.join(self.root_dir, rec_subdir, self.hr_subdir, f"{rec_name}.{self.hr_subdir}.{COLOR_ID}.{indices[-1]}.png") 
